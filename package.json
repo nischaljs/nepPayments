@@ -1,15 +1,17 @@
 {
   "name": "neppayments",
-  "version": "0.0.1",
+  "version": "0.0.5",
   "description": "A Node.js package to easily integrate Nepali payment gateways like Khalti, eSewa, and Fonepay.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "neppayments": "./dist/setup-nep-payments.js"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node add-shebang.mjs",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
-    "postinstall": "npx ts-node setup-nep-payments.ts",
-    "configure": "npx ts-node setup-nep-payments.ts",
+    "configure": "node dist/setup-nep-payments.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -43,6 +45,7 @@
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.27.0",
     "@jest/globals": "^29.7.0",
+    "@types/axios": "^0.9.36",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.8",
     "@types/jest": "^29.5.14",

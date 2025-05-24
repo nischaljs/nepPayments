@@ -29,7 +29,8 @@ const environmentQuestion: QuestionCollection<{
 const gatewaySelectionQuestion: QuestionCollection<{
   selectedGateways: GatewayName[];
 }> = {
-  gateways: {
+  selectedGateways: {
+    // Now the key matches!
     type: 'checkbox',
     message: 'Select the payment gateways you want to integrate:',
     choices: Object.values(AVAILABLE_GATEWAYS),
