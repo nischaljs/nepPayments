@@ -1,6 +1,6 @@
 {
   "name": "neppayments",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "A Node.js package to easily integrate Nepali payment gateways like Khalti, eSewa, and Fonepay.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
