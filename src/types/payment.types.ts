@@ -53,6 +53,8 @@ export interface EsewaConfig {
   productCode: string;
   secretKey: string;
   environment?: 'sandbox' | 'production';
+  successUrl: string;
+  failureUrl: string;
 }
 
 /**
@@ -144,7 +146,7 @@ export interface KhaltiPaymentResponse {
  * eSewa payment response
  */
 export interface EsewaPaymentResponse {
-  payment_url: string;
+  form_html: string;
   transaction_uuid: string;
   signature: string;
 }

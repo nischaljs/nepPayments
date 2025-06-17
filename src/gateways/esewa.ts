@@ -22,9 +22,8 @@ interface ApiError {
   error_message: string;
 }
 
-function isApiError(error: unknown): error is ApiError {
-  return typeof error === 'object' && error !== null && 
-    ('error_message' in error || 'code' in error);
+function isApiError(error: any): error is ApiError {
+  return error && typeof error.code === 'number' && typeof error.error_message === 'string';
 }
 
 /**
@@ -32,6 +31,7 @@ function isApiError(error: unknown): error is ApiError {
  */
 export class EsewaGateway {
   private readonly baseUrl: string;
+  private readonly statusCheckUrl: string;
 
   /**
    * Create a new eSewa gateway instance
@@ -45,10 +45,14 @@ export class EsewaGateway {
       );
     }
 
-    // Set base URL based on environment
-    this.baseUrl = config.environment === 'sandbox'
-      ? 'https://rc-epay.esewa.com.np/api/epay/main/v2'
-      : 'https://epay.esewa.com.np/api/epay/main/v2';
+    // Set base URLs based on environment
+    if (config.environment === 'sandbox') {
+      this.baseUrl = 'https://rc-epay.esewa.com.np/api/epay/main/v2';
+      this.statusCheckUrl = 'https://rc.esewa.com.np/api/epay/transaction/status/';
+    } else {
+      this.baseUrl = 'https://epay.esewa.com.np/api/epay/main/v2';
+      this.statusCheckUrl = 'https://esewa.com.np/api/epay/transaction/status/';
+    }
   }
 
   /**
@@ -56,26 +60,40 @@ export class EsewaGateway {
    * @private
    */
   private generateSignature(data: string): string {
-    const hmac = crypto.createHmac('sha256', this.config.secretKey);
-    hmac.update(data);
-    return hmac.digest('base64');
+    try {
+      const hmac = crypto.createHmac('sha256', this.config.secretKey);
+      hmac.update(data);
+      return hmac.digest('base64');
+    } catch (error) {
+      console.error('Error generating signature:', error);
+      throw new PaymentError(
+        'Failed to generate payment signature',
+        PaymentErrorCode.SIGNATURE_GENERATION_FAILED
+      );
+    }
   }
 
   /**
    * Create a new payment
    * @param options Payment options
-   * @returns Payment response with payment URL and transaction UUID
+   * @returns Payment response with form HTML and transaction UUID
    */
   async createPayment(options: EsewaPaymentOptions): Promise<EsewaPaymentResponse> {
     try {
+      // Validate required fields
+      if (!options.transaction_uuid || !options.total_amount) {
+        throw new PaymentError(
+          'Transaction UUID and total amount are required',
+          PaymentErrorCode.INVALID_PAYMENT_OPTIONS
+        );
+      }
+
       // Generate signature
       const signedFields = options.signed_field_names.split(',');
       const signatureData = signedFields
         .map(field => `${field}=${String(options[field as keyof EsewaPaymentOptions])}`)
         .join(',');
-      // Log the signature string and payload for debugging
-      console.log('eSewa Signature String:', signatureData);
-      console.log('eSewa Payload:', options);
+      
       const signature = this.generateSignature(signatureData);
 
       // Create form data
@@ -86,25 +104,36 @@ export class EsewaGateway {
       formData.append('signature', signature);
 
       // Make request to eSewa
-      const response = await axios.post<string>(
+      const response = await axios.post(
         `${this.baseUrl}/form`,
         formData,
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
-          }
+          },
+          validateStatus: (status: number) => status >= 200 && status < 400
         }
       );
 
-      // Extract payment URL from response
-      const paymentUrl = response.data;
+      // Check if we got a valid HTML response
+      if (!response.data || typeof response.data !== 'string') {
+        throw new PaymentError(
+          'Invalid response from eSewa: Expected HTML form',
+          PaymentErrorCode.INVALID_RESPONSE
+        );
+      }
 
+      // Return the form HTML and transaction details
       return {
-        payment_url: paymentUrl,
+        form_html: response.data,
         transaction_uuid: options.transaction_uuid,
         signature
       };
     } catch (error: any) {
+      if (error instanceof PaymentError) {
+        throw error;
+      }
+      
       // Log the error response for debugging
       if (error.response) {
         console.error('eSewa API Error:', error.response.status, error.response.data);
@@ -113,6 +142,7 @@ export class EsewaGateway {
       } else {
         console.error('eSewa API Error:', error.message);
       }
+
       if (isApiError(error)) {
         throw new PaymentError(
           error.error_message || 'Failed to create payment',
@@ -130,11 +160,19 @@ export class EsewaGateway {
    */
   async verifyPayment(options: EsewaVerificationOptions): Promise<PaymentVerificationResponse> {
     try {
+      // Validate required fields
+      if (!options.transaction_uuid || !options.total_amount) {
+        throw new PaymentError(
+          'Transaction UUID and total amount are required for verification',
+          PaymentErrorCode.INVALID_VERIFICATION_OPTIONS
+        );
+      }
+
       const response = await axios.get<StatusCheckResponse>(
-        `${this.baseUrl}/transaction/status`,
+        this.statusCheckUrl,
         {
           params: {
-            product_code: options.product_code,
+            product_code: this.config.productCode,
             transaction_uuid: options.transaction_uuid,
             total_amount: options.total_amount
           }
@@ -168,6 +206,10 @@ export class EsewaGateway {
         payment_details: payment
       };
     } catch (error) {
+      if (error instanceof PaymentError) {
+        throw error;
+      }
+
       if (isApiError(error)) {
         throw new PaymentError(
           error.error_message || 'Failed to verify payment',

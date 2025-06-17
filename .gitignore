@@ -52,3 +52,5 @@ yarn.lock
 .eslintcache
 
 test-payment.ts
+
+package-lock.json
