@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-
+docs/
 # Build outputs
 dist/
 build/
@@ -50,3 +50,5 @@ yarn.lock
 
 # Optional eslint cache
 .eslintcache
+
+test-payment.ts

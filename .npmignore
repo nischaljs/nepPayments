@@ -5,3 +5,5 @@
 /*.ts
 /*.mjs
 /*.cjs
+/docs
+test-payment.ts

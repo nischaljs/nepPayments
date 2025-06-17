@@ -7,23 +7,30 @@ export enum PaymentErrorCode {
   GATEWAY_NOT_CONFIGURED = 'GATEWAY_NOT_CONFIGURED',
 
   // Validation errors
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
   INVALID_AMOUNT = 'INVALID_AMOUNT',
-  INVALID_CURRENCY = 'INVALID_CURRENCY',
-  INVALID_CALLBACK_URL = 'INVALID_CALLBACK_URL',
-  MISSING_REQUIRED_FIELD = 'MISSING_REQUIRED_FIELD',
+  INVALID_URL = 'INVALID_URL',
+
+  // Authentication errors
+  AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
+  INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
+  TOKEN_EXPIRED = 'TOKEN_EXPIRED',
+
+  // Payment errors
+  PAYMENT_FAILED = 'PAYMENT_FAILED',
+  PAYMENT_EXPIRED = 'PAYMENT_EXPIRED',
+  PAYMENT_CANCELED = 'PAYMENT_CANCELED',
+  PAYMENT_ALREADY_COMPLETED = 'PAYMENT_ALREADY_COMPLETED',
+
+  // Verification errors
+  VERIFICATION_FAILED = 'VERIFICATION_FAILED',
+  INVALID_TRANSACTION = 'INVALID_TRANSACTION',
+  AMOUNT_MISMATCH = 'AMOUNT_MISMATCH',
 
   // Gateway errors
   GATEWAY_ERROR = 'GATEWAY_ERROR',
-  PAYMENT_FAILED = 'PAYMENT_FAILED',
-  PAYMENT_EXPIRED = 'PAYMENT_EXPIRED',
-  PAYMENT_CANCELLED = 'PAYMENT_CANCELLED',
-
-  // Network errors
-  NETWORK_ERROR = 'NETWORK_ERROR',
   GATEWAY_TIMEOUT = 'GATEWAY_TIMEOUT',
-
-  // Unknown errors
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR'
+  GATEWAY_UNAVAILABLE = 'GATEWAY_UNAVAILABLE'
 }
 
 /**
@@ -32,9 +39,9 @@ export enum PaymentErrorCode {
 export class PaymentError extends Error {
   code: PaymentErrorCode;
   gateway?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 
-  constructor(code: PaymentErrorCode, message: string, gateway?: string, details?: any) {
+  constructor(code: PaymentErrorCode, message: string, gateway?: string, details?: Record<string, unknown>) {
     super(message);
     this.name = 'PaymentError';
     this.code = code;
@@ -55,25 +62,39 @@ export class PaymentError extends Error {
       case PaymentErrorCode.INVALID_CONFIG:
         return 'Invalid payment configuration. Please check your setup.';
       case PaymentErrorCode.GATEWAY_NOT_CONFIGURED:
-        return `Payment gateway ${this.gateway} is not configured. Run setup script first.`;
+        return `Payment gateway ${this.gateway} is not configured.`;
+      case PaymentErrorCode.VALIDATION_ERROR:
+        return 'Validation error: ' + this.message;
       case PaymentErrorCode.INVALID_AMOUNT:
-        return 'Invalid payment amount. Amount must be greater than 0.';
-      case PaymentErrorCode.INVALID_CALLBACK_URL:
-        return 'Invalid callback URL provided.';
-      case PaymentErrorCode.MISSING_REQUIRED_FIELD:
-        return `Missing required field: ${this.details?.field || 'unknown'}`;
-      case PaymentErrorCode.GATEWAY_ERROR:
-        return `Payment gateway error: ${this.message}`;
+        return 'Amount should be greater than Rs. 10 (1000 paisa).';
+      case PaymentErrorCode.INVALID_URL:
+        return 'Invalid URL provided. Please provide valid return_url and website_url.';
+      case PaymentErrorCode.AUTHENTICATION_ERROR:
+        return 'Authentication failed. Please check your credentials.';
+      case PaymentErrorCode.INVALID_CREDENTIALS:
+        return 'Invalid credentials provided.';
+      case PaymentErrorCode.TOKEN_EXPIRED:
+        return 'Authentication token has expired.';
       case PaymentErrorCode.PAYMENT_FAILED:
         return 'Payment failed. Please try again.';
       case PaymentErrorCode.PAYMENT_EXPIRED:
         return 'Payment link has expired. Please try again.';
-      case PaymentErrorCode.PAYMENT_CANCELLED:
+      case PaymentErrorCode.PAYMENT_CANCELED:
         return 'Payment was cancelled by the user.';
-      case PaymentErrorCode.NETWORK_ERROR:
-        return 'Network error occurred. Please check your connection and try again.';
+      case PaymentErrorCode.PAYMENT_ALREADY_COMPLETED:
+        return 'Payment has already been completed.';
+      case PaymentErrorCode.VERIFICATION_FAILED:
+        return 'Payment verification failed.';
+      case PaymentErrorCode.INVALID_TRANSACTION:
+        return 'Invalid transaction.';
+      case PaymentErrorCode.AMOUNT_MISMATCH:
+        return 'Payment amount does not match.';
+      case PaymentErrorCode.GATEWAY_ERROR:
+        return `Payment gateway error: ${this.message}`;
       case PaymentErrorCode.GATEWAY_TIMEOUT:
         return 'Payment gateway is not responding. Please try again later.';
+      case PaymentErrorCode.GATEWAY_UNAVAILABLE:
+        return 'Payment gateway is currently unavailable.';
       default:
         return this.message || 'An unknown error occurred.';
     }

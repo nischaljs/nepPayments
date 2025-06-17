@@ -1,302 +1,323 @@
 # NepPayments
 
-A Node.js package for easy integration of Nepali payment gateways (Khalti, eSewa, and Fonepay) into your application.
+A simple and easy-to-use package for integrating Nepali payment gateways (Khalti and eSewa) into your applications. Works with both JavaScript and TypeScript projects.
 
 ## Features
 
-- ✅ Support for Khalti, eSewa, and Fonepay
-- 🔒 Sandbox/Test mode support
-- 🚀 TypeScript support with full type definitions
-- 🛡️ Comprehensive error handling
-- 📝 Easy-to-use API
-- ⚡ Promise-based async operations
-- 🔄 Payment verification support
+- 🔒 Secure payment processing with proper authentication
+- 💳 Support for multiple payment gateways:
+  - Khalti (Web Checkout)
+  - eSewa (Token-based payment)
+- 🛠 TypeScript support with full type definitions
+- ✅ Comprehensive error handling
+- 🔄 Payment verification and status checking
+- 🧪 Test environment support with sandbox credentials
+- �� Zero dependencies
+- 🔄 Automatic token refresh for eSewa
+- 🎯 Detailed payment status tracking
 
-## Installation
+## Quick Start
 
-```bash
-npm install neppayments
-```
-
-After installation, the setup script will run automatically to help you configure your payment gateways.
-
-## Configuration
-
-You can run the configuration script manually anytime:
+### 1. Install the package
 
 ```bash
-npm run configure
+npm install nep-payments
+# or
+yarn add nep-payments
 ```
 
-This will:
-1. Ask whether you want to use sandbox or production mode
-2. Let you select which payment gateways to enable
-3. Help you configure the credentials for each gateway
-4. Create a `.env` file with your settings
+### 2. Get your test credentials
 
-## Sandbox Testing
+#### Khalti
+1. Go to [Khalti Merchant Dashboard](https://test-admin.khalti.com)
+2. Sign up for a merchant account
+3. Go to Settings > API Keys
+4. Create a new API key with test mode enabled
+5. Copy your Live secret key (e.g., `1db0691eb0ce459588eba0c81a2b560e`)
 
-For testing purposes, you can use these sandbox credentials:
+Test Credentials:
+- Test Khalti IDs: 9800000000, 9800000001, 9800000002, 9800000003, 9800000004, 9800000005
+- Test MPIN: 1111
+- Test OTP: 987654
 
-### Khalti Test Credentials
-```
-Secret Key: test_secret_key_dc74e0fd57cb46cd93832aee0a507256
-Public Key: test_public_key_dc74e0fd57cb46cd93832aee0a390775
-```
+#### eSewa
+1. Go to [eSewa Merchant Portal](https://merchant.esewa.com.np)
+2. Sign up for a merchant account
+3. Go to Settings > API Configuration
+4. Get your:
+   - eSewa ID: 9806800001/2/3/4/5
+   - Password: Nepal@123
+   - MPIN: 1122 (for application only)
+   - Merchant ID/Service Code: EPAYTEST
+   - Token: 123456
+   - Secret Key: 8gBm/:&EnhH.1/q
+   - Client ID: JB0BBQ4aD0UqIThFJwAKBgAXEUkEGQUBBAwdOgABHD4DChwUAB0R
+   - Client Secret: BhwIWQQADhIYSxILExMcAgFXFhcOBwAKBgAXEQ==
 
-### eSewa Test Credentials
-```
-Merchant Code: EPAYTEST
-Merchant Secret: 8gBm/:&EnhH.1/q
-```
+### 3. Use in your code
 
-### Fonepay Test Credentials
-```
-Merchant ID: TEST_MERCHANT
-Secret Key: test_secret_key
-```
+#### JavaScript Example
+```javascript
+const { NepPayments } = require('nep-payments');
 
-## Usage Examples
-
-### Khalti Payment
-
-```typescript
-import { initiateKhaltiPayment, verifyKhaltiPayment } from 'neppayments';
-
-// Initiate payment
-const payment = await initiateKhaltiPayment({
-  amount: 1000,            // Amount in NPR
-  customerName: 'John Doe',
-  productIdentity: 'prod_123',
-  productName: 'Test Product',
-  returnUrl: 'https://your-site.com/verify',
-  websiteUrl: 'https://your-site.com'
+// Initialize with your credentials
+const payments = new NepPayments({
+  khalti: {
+    secretKey: 'test_...', // Your Khalti test secret key
+    environment: 'sandbox' // or 'production'
+  },
+  esewa: {
+    username: 'your_username',
+    password: 'base64_encoded_password',
+    clientSecret: 'base64_encoded_client_secret',
+    environment: 'sandbox' // or 'production'
+  }
 });
 
-// Verify payment
-const verification = await verifyKhaltiPayment({
-  pidx: 'payment_id_from_khalti'
-});
-```
+// Create a Khalti payment
+async function createKhaltiPayment() {
+  try {
+    const payment = await payments.khalti.createPayment({
+      amount: 1000, // Amount in paisa (1000 = Rs. 10)
+      purchase_order_id: 'ORDER_123',
+      purchase_order_name: 'Product Name',
+      return_url: 'https://your-domain.com/success',
+      website_url: 'https://your-domain.com',
+      customer_info: {
+        name: 'John Doe',
+        email: 'john@example.com',
+        phone: '9800000000'
+      },
+      amount_breakdown: [
+        {
+          label: 'Product Price',
+          amount: 800
+        },
+        {
+          label: 'VAT',
+          amount: 200
+        }
+      ],
+      product_details: [
+        {
+          identity: 'PROD_123',
+          name: 'Product Name',
+          total_price: 1000,
+          quantity: 1,
+          unit_price: 1000
+        }
+      ]
+    });
 
-### eSewa Payment
+    // Redirect user to payment URL
+    window.location.href = payment.payment_url;
+  } catch (error) {
+    console.error('Payment failed:', error.message);
+  }
+}
 
-```typescript
-import { initiateEsewaPayment, verifyEsewaPayment } from 'neppayments';
+// Create an eSewa payment
+async function createEsewaPayment() {
+  try {
+    const payment = await payments.esewa.createPayment({
+      amount: 1000,
+      request_id: 'ORDER_123',
+      properties: {
+        customer_name: 'John Doe',
+        address: 'Kathmandu',
+        customer_id: '1A4DDF',
+        invoice_number: '123456789',
+        product_name: 'Product Name'
+      }
+    });
 
-// Initiate payment
-const esewaForm = initiateEsewaPayment({
-  amount: 1000,
-  taxAmount: 0,
-  productCode: 'EPAYTEST',
-  successUrl: 'https://your-site.com/success',
-  failureUrl: 'https://your-site.com/failure'
-});
+    // Get the token to show to user
+    console.log('Payment Token:', payment.token);
+  } catch (error) {
+    console.error('Payment failed:', error.message);
+  }
+}
 
-// Render the form in your frontend
-// The form will automatically submit to eSewa
+// Verify a Khalti payment
+async function verifyKhaltiPayment(pidx) {
+  try {
+    const verification = await payments.khalti.verifyPayment({
+      pidx: pidx
+    });
 
-// Verify payment
-const verification = await verifyEsewaPayment({
-  oid: 'order_id',
-  amt: '1000',
-  refId: 'ref_id_from_esewa'
-});
-```
+    if (verification.status === 'COMPLETED') {
+      console.log('Payment successful!');
+      console.log('Transaction ID:', verification.transaction_id);
+      console.log('Amount:', verification.amount);
+    } else {
+      console.log('Payment failed');
+    }
+  } catch (error) {
+    console.error('Verification failed:', error.message);
+  }
+}
 
-### Fonepay Payment
+// Verify an eSewa payment
+async function verifyEsewaPayment(requestId, transactionCode) {
+  try {
+    const verification = await payments.esewa.verifyPayment({
+      request_id: requestId,
+      transaction_code: transactionCode,
+      amount: 1000
+    });
 
-```typescript
-import { initiateFonepayPayment, verifyFonepayPayment } from 'neppayments';
-
-// Initiate payment
-const paymentUrl = await initiateFonepayPayment({
-  customerName: 'John Doe',
-  amount: 1000,
-  transactionId: 'trans_123',
-  returnUrl: 'https://your-site.com/verify'
-});
-
-// Verify payment
-const verification = await verifyFonepayPayment({
-  PRN: 'prn_from_fonepay',
-  PID: 'your_merchant_id',
-  BID: 'bank_id',
-  AMT: '1000',
-  UID: 'unique_id',
-  DV: 'NPR'
-});
-```
-
-## Error Handling
-
-The package uses a standard error class `PaymentError` for all errors:
-
-```typescript
-try {
-  await initiateKhaltiPayment(options);
-} catch (error) {
-  if (error instanceof PaymentError) {
-    console.log(error.code);        // Error code (e.g., INVALID_AMOUNT)
-    console.log(error.message);     // Technical error message
-    console.log(error.gateway);     // Gateway name (KHALTI/ESEWA/FONEPAY)
-    console.log(error.friendlyMessage); // User-friendly error message
+    if (verification.response_code === 0) {
+      console.log('Payment successful!');
+      console.log('Transaction ID:', verification.transaction_id);
+    } else {
+      console.log('Payment failed:', verification.response_message);
+    }
+  } catch (error) {
+    console.error('Verification failed:', error.message);
   }
 }
 ```
 
-## Official Documentation References
+## API Reference
 
-- Khalti: [https://docs.khalti.com/](https://docs.khalti.com/)
-- eSewa: [https://developer.esewa.com.np/](https://developer.esewa.com.np/)
-- Fonepay: [https://www.fonepay.com/developer](https://www.fonepay.com/developer)
+### Khalti
+
+#### Create Payment
+```typescript
+const payment = await payments.khalti.createPayment({
+  amount: number;              // Amount in paisa (1000 = Rs. 10)
+  purchase_order_id: string;   // Unique order identifier
+  purchase_order_name: string; // Order name
+  return_url: string;         // URL to redirect after payment
+  website_url: string;        // Your website URL
+  customer_info?: {           // Optional customer information
+    name: string;
+    email: string;
+    phone: string;
+  };
+  amount_breakdown?: Array<{  // Optional amount breakdown
+    label: string;
+    amount: number;
+  }>;
+  product_details?: Array<{   // Optional product details
+    identity: string;
+    name: string;
+    total_price: number;
+    quantity: number;
+    unit_price: number;
+  }>;
+  merchant_username?: string;  // Optional merchant name
+  merchant_extra?: string;     // Optional merchant extra data
+});
+
+// Returns:
+{
+  pidx: string;           // Payment ID for verification
+  payment_url: string;    // URL to redirect user to
+  expires_at: string;     // Expiration timestamp
+  expires_in: number;     // Expiration in seconds
+}
+```
+
+#### Verify Payment
+```typescript
+const verification = await payments.khalti.verifyPayment({
+  pidx: string;   // Payment ID from createPayment
+});
+
+// Returns:
+{
+  status: 'COMPLETED' | 'FAILED' | 'PENDING' | 'EXPIRED' | 'CANCELED';
+  transaction_id: string;
+  amount: number;
+  payment_details: any;
+}
+```
+
+### eSewa
+
+#### Create Payment
+```typescript
+const payment = await payments.esewa.createPayment({
+  amount: number;              // Amount in NPR
+  request_id: string;          // Unique request identifier
+  properties: {                // Additional payment details
+    [key: string]: string;     // Dynamic properties as needed
+  };
+});
+
+// Returns:
+{
+  token: string;              // Payment token to show to user
+  request_id: string;         // Request ID for verification
+}
+```
+
+#### Verify Payment
+```typescript
+const verification = await payments.esewa.verifyPayment({
+  request_id: string;         // Request ID from createPayment
+  transaction_code: string;   // Transaction code from eSewa
+  amount: number;             // Amount in NPR
+});
+
+// Returns:
+{
+  response_code: number;      // 0 for success, 1 for failure
+  response_message: string;   // Success/error message
+  transaction_id: string;     // Unique transaction ID
+}
+```
+
+## Error Handling
+
+```typescript
+try {
+  await payments.khalti.createPayment(options);
+} catch (error) {
+  if (error instanceof PaymentError) {
+    switch (error.code) {
+      case 'INVALID_AMOUNT':
+        console.error('Amount should be greater than Rs. 10 (1000 paisa)');
+        break;
+      case 'INVALID_URL':
+        console.error('Invalid return_url or website_url');
+        break;
+      case 'AUTHENTICATION_ERROR':
+        console.error('Invalid API key or authentication failed');
+        break;
+      case 'GATEWAY_ERROR':
+        console.error('Payment gateway error');
+        break;
+      default:
+        console.error('Payment failed:', error.message);
+    }
+  }
+}
+```
+
+## Environment Configuration
+
+### Khalti
+- Sandbox: `https://dev.khalti.com/api/v2/`
+- Production: `https://khalti.com/api/v2/`
+
+### eSewa
+- Sandbox: `https://uat.esewa.com.np/api`
+- Production: `https://esewa.com.np/api`
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-MIT
-
-A Node.js package for easily integrating popular Nepali payment gateways (Khalti, eSewa, and Fonepay) into your application.
-
-## Features
-
-- 🚀 Easy to set up and use
-- 💳 Support for multiple payment gateways
-- 🛡️ TypeScript support with full type definitions
-- 🔒 Secure credential management
-- ✅ Payment verification support
-- 🛠️ Comprehensive error handling
-- 📝 Well-documented API
-
-## Installation
-
-```bash
-npm install neppayments
-```
-
-## Quick Setup
-
-After installation, the package will prompt you to configure your payment gateway credentials. You can also run the setup manually:
-
-```bash
-npx neppayments configure
-```
-
-## Usage
-
-### 1. Khalti Integration
-
-```typescript
-import { initiateKhaltiPayment, verifyKhaltiPayment } from 'neppayments';
-
-// Initiate payment
-const paymentUrl = await initiateKhaltiPayment({
-  amount: 1000, // amount in NPR
-  customerName: 'John Doe',
-  customerEmail: 'john@example.com',
-  customerPhone: '9841234567',
-  productIdentity: 'prod_123',
-  productName: 'Test Product',
-  returnUrl: 'https://yourapp.com/payment/verify',
-  websiteUrl: 'https://yourapp.com'
-});
-
-// Verify payment
-const verificationResult = await verifyKhaltiPayment({
-  pidx: 'payment_id_from_khalti',
-  transaction_id: 'your_transaction_id'
-});
-```
-
-### 2. eSewa Integration
-
-```typescript
-import { initiateEsewaPayment, verifyEsewaPayment } from 'neppayments';
-
-// Initiate payment
-const formHtml = initiateEsewaPayment({
-  amount: 1000,
-  taxAmount: 0,
-  productCode: 'EPAYTEST',
-  successUrl: 'https://yourapp.com/payment/success',
-  failureUrl: 'https://yourapp.com/payment/failure'
-});
-
-// Verify payment
-const verificationResult = await verifyEsewaPayment({
-  oid: 'order_id',
-  amt: '1000',
-  refId: 'ref_id_from_esewa'
-});
-```
-
-### 3. Fonepay Integration
-
-```typescript
-import { initiateFonepayPayment, verifyFonepayPayment } from 'neppayments';
-
-// Initiate payment
-const paymentUrl = await initiateFonepayPayment({
-  amount: 1000,
-  customerName: 'John Doe',
-  transactionId: 'trans_123',
-  returnUrl: 'https://yourapp.com/payment/verify'
-});
-
-// Verify payment
-const verificationResult = await verifyFonepayPayment({
-  PRN: 'transaction_id',
-  PID: 'merchant_id',
-  BID: 'bank_id',
-  AMT: '1000',
-  UID: 'unique_id',
-  DV: 'NPR'
-});
-```
-
-## Error Handling
-
-The package uses a custom `PaymentError` class for error handling. All errors thrown by the package will be instances of this class:
-
-```typescript
-try {
-  const paymentUrl = await initiateKhaltiPayment(options);
-} catch (error) {
-  if (error instanceof PaymentError) {
-    console.log(error.code); // Error code (e.g., INVALID_AMOUNT)
-    console.log(error.message); // Technical error message
-    console.log(error.friendlyMessage); // User-friendly error message
-    console.log(error.gateway); // Payment gateway name
-    console.log(error.details); // Additional error details
-  }
-}
-```
-
-## Configuration
-
-The package reads configuration from environment variables. You can set these manually or use the setup script:
-
-```env
-# Khalti Configuration
-KHALTI_SECRET_KEY="your_secret_key"
-KHALTI_PUBLIC_KEY="your_public_key"
-
-# eSewa Configuration
-ESEWA_MERCHANT_CODE="your_merchant_code"
-ESEWA_MERCHANT_SECRET="your_merchant_secret"
-
-# Fonepay Configuration
-FONEPAY_MERCHANT_ID="your_merchant_id"
-FONEPAY_SECRET_KEY="your_secret_key"
-```
-
-## Development Mode
-
-The package automatically detects development mode when `NODE_ENV !== 'production'` and uses test URLs for the payment gateways.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For issues and feature requests, please use the [GitHub issue tracker](https://github.com/nischaljs/neppayments/issues).
-
-## License
-
-MIT License - see the [LICENSE](LICENSE) file for details.
+For support, please open an issue in the GitHub repository or contact us at [support email].
