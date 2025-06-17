@@ -50,9 +50,8 @@ export interface KhaltiConfig {
  * Configuration for eSewa payment gateway
  */
 export interface EsewaConfig {
-  username: string;
-  password: string;
-  clientSecret: string;
+  productCode: string;
+  secretKey: string;
   environment?: 'sandbox' | 'production';
 }
 
@@ -111,11 +110,16 @@ export interface KhaltiPaymentOptions {
  * eSewa payment creation options
  */
 export interface EsewaPaymentOptions {
-  amount: number;              // Amount in NPR
-  request_id: string;          // Unique request identifier
-  properties: {                // Additional payment details
-    [key: string]: string;     // Dynamic properties as needed
-  };
+  amount: number;
+  tax_amount: number;
+  total_amount: number;
+  transaction_uuid: string;
+  product_code: string;
+  product_service_charge: number;
+  product_delivery_charge: number;
+  success_url: string;
+  failure_url: string;
+  signed_field_names: string;
 }
 
 /**
@@ -140,15 +144,9 @@ export interface KhaltiPaymentResponse {
  * eSewa payment response
  */
 export interface EsewaPaymentResponse {
-  token: string;              // Payment token to show to user
-  request_id: string;         // Request ID for verification
-  amount: number;             // Payment amount
-  properties: Record<string, string>; // Payment properties
-  packages?: Array<{         // Optional package selection
-    display: string;         // Package display name
-    value: number;           // Package amount
-    properties: Record<string, string>; // Package properties
-  }>;
+  payment_url: string;
+  transaction_uuid: string;
+  signature: string;
 }
 
 /**
@@ -169,9 +167,9 @@ export interface KhaltiVerificationOptions {
  * eSewa payment verification options
  */
 export interface EsewaVerificationOptions {
-  request_id: string;         // Request ID from createPayment
-  transaction_code: string;   // Transaction code from eSewa
-  amount: number;             // Amount in NPR
+  product_code: string;
+  transaction_uuid: string;
+  total_amount: number;
 }
 
 /**

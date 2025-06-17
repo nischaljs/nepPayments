@@ -1,6 +1,6 @@
 {
   "name": "neppayments",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A simple and easy-to-use package for integrating Nepali payment gateways (Khalti and eSewa) into your applications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,7 +23,9 @@
   "license": "MIT",
   "dependencies": {
     "@types/axios": "^0.9.36",
-    "axios": "^1.10.0"
+    "axios": "^1.10.0",
+    "crypto-js": "^4.2.0",
+    "form-data": "^4.0.3"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
@@ -34,6 +36,7 @@
     "jest": "^29.7.0",
     "prettier": "^3.2.5",
     "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
   "files": [

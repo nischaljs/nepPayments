@@ -1,4 +1,5 @@
 import axios from 'axios';
+import crypto from 'crypto';
 import { PaymentError, PaymentErrorCode } from '../types/payment.enums';
 import { 
   EsewaConfig, 
@@ -8,43 +9,22 @@ import {
   PaymentVerificationResponse
 } from '../types/payment.types';
 
-interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  token_type: string;
-  refresh_expires_in: number;
-}
-
-interface PaymentResponse {
-  token: string;
-  request_id: string;
-  response_code: number;
-  response_message: string;
-  amount: number;
-  properties: Record<string, string>;
-  packages?: Array<{
-    display: string;
-    value: number;
-    properties: Record<string, string>;
-  }>;
-}
-
-interface VerificationResponse {
-  response_code: number;
-  response_message: string;
-  transaction_id: string;
-  amount: number;
+interface StatusCheckResponse {
+  product_code: string;
+  transaction_uuid: string;
+  total_amount: number;
+  status: 'COMPLETE' | 'PENDING' | 'FULL_REFUND' | 'PARTIAL_REFUND' | 'AMBIGUOUS' | 'NOT_FOUND' | 'CANCELED';
+  ref_id: string | null;
 }
 
 interface ApiError {
-  response_message?: string;
-  response_code?: number;
+  code: number;
+  error_message: string;
 }
 
 function isApiError(error: unknown): error is ApiError {
   return typeof error === 'object' && error !== null && 
-    ('response_message' in error || 'response_code' in error);
+    ('error_message' in error || 'code' in error);
 }
 
 /**
@@ -52,130 +32,90 @@ function isApiError(error: unknown): error is ApiError {
  */
 export class EsewaGateway {
   private readonly baseUrl: string;
-  private accessToken?: string;
-  private refreshToken?: string;
-  private tokenExpiry?: number;
 
   /**
    * Create a new eSewa gateway instance
    * @param config eSewa configuration
    */
   constructor(private readonly config: EsewaConfig) {
-    if (!config.username || !config.password || !config.clientSecret) {
+    if (!config.productCode || !config.secretKey) {
       throw new PaymentError(
-        'eSewa username, password and client secret are required',
-        PaymentErrorCode.INVALID_CONFIG
-      );
-    }
-
-    // Validate client secret length
-    const decodedSecret = Buffer.from(config.clientSecret, 'base64').toString();
-    if (decodedSecret.length < 32 || decodedSecret.length > 64) {
-      throw new PaymentError(
-        'Client secret must be base64 encoded and 32-64 characters long',
+        'eSewa product code and secret key are required',
         PaymentErrorCode.INVALID_CONFIG
       );
     }
 
     // Set base URL based on environment
     this.baseUrl = config.environment === 'sandbox'
-      ? 'https://uat.esewa.com.np/api'
-      : 'https://esewa.com.np/api';
+      ? 'https://rc-epay.esewa.com.np/api/epay/main/v2'
+      : 'https://epay.esewa.com.np/api/epay/main/v2';
   }
 
   /**
-   * Get authentication token
+   * Generate HMAC signature for the payment
    * @private
    */
-  private async getAuthToken(): Promise<string> {
-    // Check if we have a valid token
-    if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
-      return this.accessToken;
-    }
-
-    // If we have a refresh token, try to use it
-    if (this.refreshToken) {
-      try {
-        const response = await axios.post<TokenResponse>(`${this.baseUrl}/access-token`, {
-          grant_type: 'refresh_token',
-          refresh_token: this.refreshToken,
-          client_secret: this.config.clientSecret
-        });
-
-        this.accessToken = response.data.access_token;
-        this.refreshToken = response.data.refresh_token;
-        this.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
-        return this.accessToken;
-      } catch (error) {
-        // If refresh fails, we'll get a new token
-        this.refreshToken = undefined;
-      }
-    }
-
-    // Get new token
-    try {
-      const response = await axios.post<TokenResponse>(`${this.baseUrl}/access-token`, {
-        grant_type: 'password',
-        client_secret: this.config.clientSecret,
-        username: this.config.username,
-        password: this.config.password
-      });
-
-      this.accessToken = response.data.access_token;
-      this.refreshToken = response.data.refresh_token;
-      this.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
-      return this.accessToken;
-    } catch (error) {
-      if (isApiError(error)) {
-        throw new PaymentError(
-          error.response_message || 'Authentication failed',
-          PaymentErrorCode.AUTHENTICATION_ERROR
-        );
-      }
-      throw new PaymentError('Authentication failed', PaymentErrorCode.AUTHENTICATION_ERROR);
-    }
+  private generateSignature(data: string): string {
+    const hmac = crypto.createHmac('sha256', this.config.secretKey);
+    hmac.update(data);
+    return hmac.digest('base64');
   }
 
   /**
    * Create a new payment
    * @param options Payment options
-   * @returns Payment response with token and request ID
+   * @returns Payment response with payment URL and transaction UUID
    */
   async createPayment(options: EsewaPaymentOptions): Promise<EsewaPaymentResponse> {
     try {
-      const token = await this.getAuthToken();
-      const response = await axios.post<PaymentResponse>(
-        `${this.baseUrl}/inquiry`,
-        {
-          request_id: options.request_id,
-          amount: options.amount,
-          properties: options.properties
-        },
+      // Generate signature
+      const signedFields = options.signed_field_names.split(',');
+      const signatureData = signedFields
+        .map(field => `${field}=${String(options[field as keyof EsewaPaymentOptions])}`)
+        .join(',');
+      // Log the signature string and payload for debugging
+      console.log('eSewa Signature String:', signatureData);
+      console.log('eSewa Payload:', options);
+      const signature = this.generateSignature(signatureData);
+
+      // Create form data
+      const formData = new URLSearchParams();
+      Object.entries(options).forEach(([key, value]) => {
+        formData.append(key, String(value));
+      });
+      formData.append('signature', signature);
+
+      // Make request to eSewa
+      const response = await axios.post<string>(
+        `${this.baseUrl}/form`,
+        formData,
         {
           headers: {
-            Authorization: `Bearer ${token}`
+            'Content-Type': 'application/x-www-form-urlencoded'
           }
         }
       );
 
-      if (response.data.response_code !== 0) {
-        throw new PaymentError(
-          response.data.response_message || 'Failed to create payment',
-          PaymentErrorCode.PAYMENT_FAILED
-        );
-      }
+      // Extract payment URL from response
+      const paymentUrl = response.data;
 
       return {
-        token: response.data.token,
-        request_id: response.data.request_id,
-        amount: response.data.amount,
-        properties: response.data.properties,
-        packages: response.data.packages
+        payment_url: paymentUrl,
+        transaction_uuid: options.transaction_uuid,
+        signature
       };
-    } catch (error) {
+    } catch (error: any) {
+      // Log the error response for debugging
+      if (error.response) {
+        console.error('eSewa API Error:', error.response.status, error.response.data);
+      } else if (error.request) {
+        console.error('eSewa API No Response:', error.request);
+      } else {
+        console.error('eSewa API Error:', error.message);
+      }
       if (isApiError(error)) {
         throw new PaymentError(
-          error.response_message || 'Failed to create payment',
+          error.error_message || 'Failed to create payment',
           PaymentErrorCode.PAYMENT_FAILED
         );
       }
@@ -190,33 +130,47 @@ export class EsewaGateway {
    */
   async verifyPayment(options: EsewaVerificationOptions): Promise<PaymentVerificationResponse> {
     try {
-      const token = await this.getAuthToken();
-      const response = await axios.post<VerificationResponse>(
-        `${this.baseUrl}/payment`,
+      const response = await axios.get<StatusCheckResponse>(
+        `${this.baseUrl}/transaction/status`,
         {
-          request_id: options.request_id,
-          amount: options.amount,
-          transaction_code: options.transaction_code
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
+          params: {
+            product_code: options.product_code,
+            transaction_uuid: options.transaction_uuid,
+            total_amount: options.total_amount
           }
         }
       );
 
       const payment = response.data;
 
+      // Map eSewa status to normalized status
+      let status: PaymentVerificationResponse['status'];
+      switch (payment.status) {
+        case 'COMPLETE':
+          status = 'COMPLETED';
+          break;
+        case 'PENDING':
+          status = 'PENDING';
+          break;
+        case 'FULL_REFUND':
+        case 'PARTIAL_REFUND':
+        case 'CANCELED':
+          status = 'CANCELED';
+          break;
+        default:
+          status = 'FAILED';
+      }
+
       return {
-        status: payment.response_code === 0 ? 'COMPLETED' : 'FAILED',
-        transaction_id: payment.transaction_id,
-        amount: payment.amount,
+        status,
+        transaction_id: payment.ref_id || '',
+        amount: payment.total_amount,
         payment_details: payment
       };
     } catch (error) {
       if (isApiError(error)) {
         throw new PaymentError(
-          error.response_message || 'Failed to verify payment',
+          error.error_message || 'Failed to verify payment',
           PaymentErrorCode.VERIFICATION_FAILED
         );
       }

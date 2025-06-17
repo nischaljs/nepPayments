@@ -2,7 +2,6 @@
 /eslint.config.mjs
 /jest.config.cjs
 /add-shebang.mjs
-/*.ts
 /*.mjs
 /*.cjs
 /docs
