@@ -40,7 +40,7 @@ export interface PlugContext<C, E, S> {
 }
 
 /** What a plug's verify and status report. The socket checks it. */
-export type PlugVerify = Omit<StatusResult, 'gateway' | 'paid'>;
+export type PlugVerify = Omit<StatusResult, 'gateway'>;
 
 /**
  * A gateway plug. The socket (`connect`) does config validation, secret
@@ -72,6 +72,7 @@ export interface Client<I, CB, SI, RI> {
   initiate(input: I & InitiateCommon): Promise<InitiateResult>;
   verify(input: VerifyInput): Promise<VerifyResult>;
   parseCallback(input: CB): Promise<CallbackResult>;
+  /** Ask the gateway for the status, with no checks. Not for fulfilment, use `verify()`. The result has no `paid` field. */
   status(input: SI): Promise<StatusResult>;
   refund(input: RI): Promise<RefundResult>;
 }
@@ -175,7 +176,8 @@ export function connect<C, E, S, I, CB, SI, RI>(
 
   const finish = (r: PlugVerify, redactor: Redactor): StatusResult => {
     if (!STATUSES.includes(r.status)) fail({ code: 'INVALID_RESPONSE', message: `${gateway} plug returned an unknown status.` });
-    return Object.freeze({ gateway, ...r, raw: redactor.value(r.raw), paid: r.status === 'paid' });
+    // No `paid` here: only verify sets it, after its checks.
+    return { gateway, ...r, raw: redactor.value(r.raw) };
   };
 
   const mockVerify = (ref: string): PlugVerify => {
@@ -245,7 +247,7 @@ export function connect<C, E, S, I, CB, SI, RI>(
             }
           }
         }
-        return Object.freeze({ ...r, checked: { amount: amountChecked, orderId: orderChecked } });
+        return Object.freeze({ ...r, paid: r.status === 'paid', checked: { amount: amountChecked, orderId: orderChecked } });
       }),
 
     parseCallback: input =>
@@ -267,10 +269,10 @@ export function connect<C, E, S, I, CB, SI, RI>(
       guard(async ({ ctx, redactor }) => {
         if (!ctx) {
           const ref = typeof input === 'string' ? input : (input as { ref?: string } | null)?.ref;
-          return finish(mockVerify(String(ref)), redactor);
+          return Object.freeze(finish(mockVerify(String(ref)), redactor));
         }
         if (!plug.status) return notSupported('status call');
-        return finish(await plug.status(ctx, input), redactor);
+        return Object.freeze(finish(await plug.status(ctx, input), redactor));
       }),
 
     refund: input =>

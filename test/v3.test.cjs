@@ -105,6 +105,11 @@ test('khalti: verify paid, amount mismatch, statuses', async () => {
   assert.equal(v.amount, 1000);
   assert.deepEqual(v.checked, { amount: true, orderId: false });
   assert.ok(Object.isFrozen(v));
+  const st = await p.khalti.status(s.ref);
+  assert.equal(st.status, 'paid');
+  assert.equal('paid' in st, false, 'status() is not for fulfilment and has no paid field');
+  assert.equal('checked' in st, false);
+  assert.ok(Object.isFrozen(st));
   await rejects(p.khalti.verify({ ref: s.ref, expectedAmount: rupees(11), expectedOrderId: 'o-1' }), 'AMOUNT_MISMATCH');
   for (const [raw, want] of [['Pending', 'pending'], ['Initiated', 'pending'], ['Expired', 'expired'], ['User canceled', 'canceled'], ['Refunded', 'refunded'], ['Partially Refunded', 'refunded'], ['Something new', 'ambiguous']]) {
     fake.set(s.ref, { status: raw });
@@ -338,6 +343,9 @@ test('mock mode: no keys, no network, outcome follows mockOutcome', async () => 
     assert.equal((await p[g].verify({ ref: failed.ref, expectedAmount: rupees(10), expectedOrderId: 'o-1' })).status, 'failed', g);
     const cb = await p[g].parseCallback({ anything: paid.ref });
     assert.equal(cb.ref, paid.ref);
+    const st = await p[g].status({ ref: paid.ref, orderId: 'o-1', amount: rupees(10) });
+    assert.equal(st.status, 'paid', g);
+    assert.equal('paid' in st, false, `${g} status() must not say paid`);
   }
   assert.equal((await p.khalti.refund({ transactionId: 'x' })).ok, true);
   await rejects(p.esewa.refund({}), 'NOT_SUPPORTED');

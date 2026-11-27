@@ -99,8 +99,12 @@ export interface CallbackResult {
   raw: unknown;
 }
 
-/** What `status` returns: the same as verify, without your expected values checked. */
-export type StatusResult = Omit<VerifyResult, 'checked'>;
+/**
+ * What `status` returns: the gateway's report, with none of your expected values checked.
+ * Not for fulfilment, use `verify()`. It has no `paid` field on purpose: a `paid`
+ * status here only says what the gateway reported, not that the amount and order match.
+ */
+export type StatusResult = Omit<VerifyResult, 'checked' | 'paid'>;
 
 /** What `refund` returns. */
 export interface RefundResult {

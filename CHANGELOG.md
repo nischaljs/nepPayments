@@ -8,7 +8,7 @@ New package name: `nepal-payments` (was `nep-payments`). Release candidate.
 
 - `createPayments({ mode, khalti?, esewa?, connectips?, hamropay? })`. Only the gateways you configure exist on the result, and TypeScript knows which.
 - ConnectIPS (RSA-signed form from a .pfx or PEM key, `validatetxn`) and Hamro Pay (session, signed form, signed webhook, transaction status).
-- One shape for every gateway: `initiate` returns `redirect` or `form`; `parseCallback`; `verify({ ref, expectedAmount, expectedOrderId })`; `status`; `refund` (Khalti).
+- One shape for every gateway: `initiate` returns `redirect` or `form`; `parseCallback`; `verify({ ref, expectedAmount, expectedOrderId })`; `status` (no checks and no `paid` field, so it is not for fulfilment); `refund` (Khalti).
 - Statuses `paid`, `pending`, `failed`, `canceled`, `refunded`, `expired`, `ambiguous`. eSewa AMBIGUOUS and Khalti Refunded keep their own status.
 - `verify` checks the amount and, where the gateway reports it, the order id.
 - Amounts are integer paisa everywhere (`paisa`, `rupees`, `toRupeeString`).
