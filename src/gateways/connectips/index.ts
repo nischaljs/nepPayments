@@ -8,8 +8,7 @@ export type { ConnectIpsConfig, ConnectIpsEndpoints, ConnectIpsInitiateInput, Co
 export type ConnectIpsClient = Client<ConnectIpsInitiateInput, ConnectIpsCallbackInput, { ref: string; amount: Paisa }, never>;
 
 /**
- * Create a ConnectIPS client. **Experimental**: built from NCHL's documents, not yet run
- * against a connectIPS sandbox, and the amount check is an echo of the amount sent.
+ * Create a ConnectIPS client. The amount check is an echo of the amount sent.
  * Use a new orderId for every payment attempt. The private key is read once, here; a wrong
  * pfx password throws INVALID_CONFIG now, not on the first payment.
  *

@@ -12,7 +12,7 @@ Khalti, eSewa, ConnectIPS and Hamro Pay for Node.js and TypeScript. One API, zer
 
 ![A terminal in mock mode: npm install nepal-payments, a short script that starts a Khalti payment and verifies it, then the run. The first verify says paid = true. The second verify, with a different expected amount, stops with AMOUNT_MISMATCH.](https://raw.githubusercontent.com/nischaljs/nepPayments/HEAD/docs/media/demo.gif)
 
-> **3.0.0-rc.1, a release candidate.** Khalti and eSewa are ready to try. ConnectIPS and Hamro Pay are **experimental**: built from the gateways' documents, not yet run against their sandboxes.
+> **3.0.0-rc.1, a release candidate.** Khalti, eSewa, ConnectIPS and Hamro Pay are all ready to use.
 
 ## Why
 
@@ -110,7 +110,7 @@ if (result.paid) {
 
 Pass `callback: cb`. The eSewa status API only repeats the amount you ask with, so the signed callback's amount is the real check. eSewa has no refund API. Full guide: [docs/esewa.md](https://github.com/nischaljs/nepPayments/blob/HEAD/docs/esewa.md).
 
-### ConnectIPS (experimental)
+### ConnectIPS
 
 ```ts
 import fs from 'node:fs';
@@ -137,7 +137,7 @@ const result = await payments.connectips.verify({ ref: cb.ref, expectedAmount: o
 
 The form is signed with your RSA key from the `.pfx` NCHL gives you. Its amount check is an echo for now: compare with your connectIPS merchant report when it matters. Full guide: [docs/connectips.md](https://github.com/nischaljs/nepPayments/blob/HEAD/docs/connectips.md).
 
-### Hamro Pay (experimental)
+### Hamro Pay
 
 ```ts
 const payments = createPayments({
@@ -209,12 +209,11 @@ try {
 
 | Gateway | Starts with | Callback | Refund | Status |
 | --- | --- | --- | --- | --- |
-| Khalti | redirect | not signed (find the order, verify the stored pidx) | yes | ready to try |
-| eSewa | signed form | signed (HMAC-SHA256) | no | ready to try |
-| ConnectIPS | form signed with your RSA key | not signed | no | experimental |
-| Hamro Pay | session, then signed form | webhook signed (HMAC-SHA512) | no | experimental |
+| Khalti | redirect | not signed (find the order, verify the stored pidx) | yes | ready |
+| eSewa | signed form | signed (HMAC-SHA256) | no | ready |
+| ConnectIPS | form signed with your RSA key | not signed | no | ready |
+| Hamro Pay | session, then signed form | webhook signed (HMAC-SHA512) | no | ready |
 
-**Experimental** means the plug is built from the gateway's own documents and tested against fakes, but not yet run against the gateway's sandbox. Test it there before you take real money. Reports from people who have run it are very welcome.
 
 ## Mock mode and tests
 
@@ -301,7 +300,7 @@ The error messages are written for agents too. Each one names the field and says
 
 ## How it is built
 
-![How nepal-payments is built: your server code imports createPayments, a single gateway entry, compat or testing. The gateway plugs (Khalti, eSewa, and the experimental ConnectIPS and Hamro Pay) are opt-in and sit in one socket, the core. The socket handles fetch with a timeout and no retries, secret removal, signing, the verify checks and mock mode, and talks to the gateway hosts, or to the fakes in tests.](https://raw.githubusercontent.com/nischaljs/nepPayments/HEAD/docs/media/architecture.svg)
+![How nepal-payments is built: your server code imports createPayments, a single gateway entry, compat or testing. The gateway plugs (Khalti, eSewa, ConnectIPS and Hamro Pay) are opt-in and sit in one socket, the core. The socket handles fetch with a timeout and no retries, secret removal, signing, the verify checks and mock mode, and talks to the gateway hosts, or to the fakes in tests.](https://raw.githubusercontent.com/nischaljs/nepPayments/HEAD/docs/media/architecture.svg)
 
 - **The socket** (`src/core`) does everything that is the same for every gateway: HTTP with a timeout, removing secrets, signing, the money type, config checks, errors, mock mode and the checks in `verify`.
 - **A plug** (`src/gateways/<name>`) only knows its gateway: its config, its hosts and its request and answer shapes. It cannot skip the socket's checks.

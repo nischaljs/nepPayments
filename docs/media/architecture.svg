@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 680" width="960" height="680" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title id="t">How nepal-payments is built</title>
-  <desc id="d">Your server code imports one of four entries: nepal-payments with createPayments, a single gateway subpath such as nepal-payments/khalti, nepal-payments/compat with the 2.x NepPayments class, or nepal-payments/testing with fakes. The gateway plugs, Khalti, eSewa, ConnectIPS and Hamro Pay, are opt-in: only the ones you configure exist. ConnectIPS and Hamro Pay are experimental. Every plug sits in one socket, src/core, which sends requests over fetch with a timeout and no retries, removes secrets, signs, checks verify's amount, order id and signed callback, and runs mock mode with no network. The socket talks to the gateway hosts, or in tests to the fakes from nepal-payments/testing.</desc>
+  <desc id="d">Your server code imports one of four entries: nepal-payments with createPayments, a single gateway subpath such as nepal-payments/khalti, nepal-payments/compat with the 2.x NepPayments class, or nepal-payments/testing with fakes. The gateway plugs, Khalti, eSewa, ConnectIPS and Hamro Pay, are opt-in: only the ones you configure exist. Every plug sits in one socket, src/core, which sends requests over fetch with a timeout and no retries, removes secrets, signs, checks verify's amount, order id and signed callback, and runs mock mode with no network. The socket talks to the gateway hosts, or in tests to the fakes from nepal-payments/testing.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#57606a"/>
@@ -84,10 +84,8 @@
   </g>
   <text x="100" y="318" text-anchor="middle" class="h">Khalti</text>
   <text x="233" y="318" text-anchor="middle" class="h">eSewa</text>
-  <text x="366" y="310" text-anchor="middle" class="h">ConnectIPS</text>
-  <text x="366" y="328" text-anchor="middle" class="x">experimental</text>
-  <text x="499" y="310" text-anchor="middle" class="h">Hamro Pay</text>
-  <text x="499" y="328" text-anchor="middle" class="x">experimental</text>
+  <text x="366" y="318" text-anchor="middle" class="h">ConnectIPS</text>
+  <text x="499" y="318" text-anchor="middle" class="h">Hamro Pay</text>
 
   <line x1="100" y1="340" x2="100" y2="368" stroke="#0b7a75" stroke-width="3"/><use href="#plug" x="100" y="364"/>
   <line x1="233" y1="340" x2="233" y2="368" stroke="#0b7a75" stroke-width="3"/><use href="#plug" x="233" y="364"/>

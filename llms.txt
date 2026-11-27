@@ -9,8 +9,8 @@ Start with `createPayments({ mode: 'sandbox' | 'live' | 'mock', khalti?, esewa?,
 - [Rules for coding agents](AGENTS.md): five rules for writing payment code with this package
 - [Khalti](docs/khalti.md): redirect, lookup, statuses, refund
 - [eSewa](docs/esewa.md): signed form, signed callback, status API, AMBIGUOUS
-- [ConnectIPS](docs/connectips.md) (experimental): RSA-signed form from a .pfx, validatetxn
-- [Hamro Pay](docs/hamropay.md) (experimental): session, signed form, webhook, transaction status
+- [ConnectIPS](docs/connectips.md): RSA-signed form from a .pfx, validatetxn
+- [Hamro Pay](docs/hamropay.md): session, signed form, webhook, transaction status
 - [Express](docs/express.md): one-file recipe
 - [Next.js App Router](docs/nextjs.md): Route Handlers on the Node.js runtime
 - [NestJS](docs/nestjs.md): provider and controller

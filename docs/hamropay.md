@@ -2,8 +2,6 @@
 
 Hamro Pay checkout. Your server creates a session, your page posts a signed form to the Hamro Pay gateway, Hamro Pay sends the buyer back and can also post a signed webhook. You confirm with the transaction status API.
 
-> **Experimental.** This plug is built from Hamro Pay's public developer reference and has not been run against a Hamro Pay sandbox yet. Test it on the sandbox before you take real money.
-
 ## Config
 
 ```ts

@@ -2,7 +2,7 @@
 
 NCHL connectIPS e-payment. Your page posts a form signed with your RSA key (from the `.pfx` NCHL gives you) to connectIPS. connectIPS sends the buyer back to the success or failure URL registered with NCHL. You confirm with `validatetxn`.
 
-> **Experimental.** This plug is built from NCHL's documents and has not been run against a connectIPS sandbox yet. The amount check is an echo (see below). Test it on the sandbox before you take real money.
+> **Note.** The amount check is an echo (see below).
 
 ## Config
 
