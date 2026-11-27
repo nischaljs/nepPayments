@@ -77,19 +77,34 @@ export enum PaymentErrorCode {
   SIGNATURE_GENERATION_FAILED = 'SIGNATURE_GENERATION_FAILED',
   INVALID_PAYMENT_OPTIONS = 'INVALID_PAYMENT_OPTIONS',
   INVALID_RESPONSE = 'INVALID_RESPONSE',
-  INVALID_VERIFICATION_OPTIONS = 'INVALID_VERIFICATION_OPTIONS'
+  INVALID_VERIFICATION_OPTIONS = 'INVALID_VERIFICATION_OPTIONS',
+  AMOUNT_MISMATCH = 'AMOUNT_MISMATCH'
 }
 
 /**
  * Custom error class for payment-related errors
  */
 export class PaymentError extends Error {
+  /**
+   * The gateway's HTTP status and body, when the gateway answered.
+   * Request headers, config and the secret key are never kept.
+   */
+  public response?: { status: number; data: unknown };
+
   constructor(
     message: string,
-    public code: PaymentErrorCode
+    public code: PaymentErrorCode,
+    response?: { status: number; data: unknown }
   ) {
     super(message);
     this.name = 'PaymentError';
+    if (response) {
+      this.response = { status: response.status, data: response.data };
+    }
+  }
+
+  toJSON(): { name: string; message: string; code: PaymentErrorCode; response?: { status: number; data: unknown } } {
+    return { name: this.name, message: this.message, code: this.code, response: this.response };
   }
 }
 

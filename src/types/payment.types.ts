@@ -163,6 +163,8 @@ export interface BaseVerificationOptions {
  */
 export interface KhaltiVerificationOptions {
   pidx: string;   // Payment ID from createPayment
+  /** Amount in paisa you expect. When it differs from Khalti's total_amount, verifyPayment throws AMOUNT_MISMATCH. */
+  expectedAmount?: number;
 }
 
 /**
@@ -172,6 +174,8 @@ export interface EsewaVerificationOptions {
   product_code: string;
   transaction_uuid: string;
   total_amount: number;
+  /** Amount in rupees you expect. When it differs from eSewa's total_amount, verifyPayment throws AMOUNT_MISMATCH. */
+  expectedAmount?: number;
 }
 
 /**
@@ -182,6 +186,8 @@ export interface PaymentVerificationResponse {
   transaction_id: string;
   amount: number;
   payment_details: any;
+  /** The gateway's own status word, unchanged (for example "Refunded" or "AMBIGUOUS"). */
+  raw_status?: string;
 }
 
 /**

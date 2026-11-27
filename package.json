@@ -1,26 +1,47 @@
 {
   "name": "neppayments",
-  "version": "2.0.3",
-  "description": "A simple and easy-to-use package for integrating Nepali payment gateways (Khalti and eSewa) into your applications",
+  "version": "2.0.7",
+  "description": "Khalti and eSewa payment gateway integration for Node.js and TypeScript (Nepal). One API to create, verify and check payments, with amount checks and errors that never leak your secret key.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "jest",
+    "test": "npm run build && node --test test/*.test.cjs",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "prepare": "npm run build"
   },
   "keywords": [
     "nepal",
+    "nepali",
     "payment",
+    "payment-gateway",
     "khalti",
+    "khalti-payment",
+    "khalti-integration",
     "esewa",
-    "gateway",
-    "typescript"
+    "esewa-payment",
+    "esewa-integration",
+    "esewa-v2",
+    "epay",
+    "nodejs",
+    "typescript",
+    "express",
+    "nextjs",
+    "nestjs",
+    "npr",
+    "fintech"
   ],
   "author": "Nischal Bhattarai",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nischaljs/nepPayments.git"
+  },
+  "homepage": "https://github.com/nischaljs/nepPayments#readme",
+  "bugs": {
+    "url": "https://github.com/nischaljs/nepPayments/issues"
+  },
   "dependencies": {
     "axios": "^1.10.0",
     "crypto-js": "^4.2.0"
@@ -41,7 +62,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=14.0.0"

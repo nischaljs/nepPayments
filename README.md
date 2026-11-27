@@ -1,6 +1,18 @@
-# NepPayments: Unified Khalti & eSewa Payment Integration
+# neppayments: Khalti and eSewa payment integration for Node.js
 
-A simple Node.js package to integrate both **Khalti** and **eSewa** payment gateways with a unified, developer-friendly API. This package is designed for backend use, where your server generates the payment form or URL and serves it to the client.
+[![npm version](https://img.shields.io/npm/v/neppayments)](https://www.npmjs.com/package/neppayments)
+[![npm downloads](https://img.shields.io/npm/dm/neppayments)](https://www.npmjs.com/package/neppayments)
+[![license: MIT](https://img.shields.io/npm/l/neppayments)](LICENSE)
+[![types: TypeScript](https://img.shields.io/badge/types-TypeScript-informational)](https://www.npmjs.com/package/neppayments)
+
+Accept payments in Nepal with **Khalti** and **eSewa** from one Node.js or TypeScript API. Create a payment, send the customer to the gateway, then verify it on your server. Works with Express, Next.js, NestJS and any Node.js backend.
+
+- **One API for both gateways:** `createPayment` and `verifyPayment` work the same way for Khalti and eSewa.
+- **Amount check:** pass `expectedAmount` and a payment for the wrong amount throws `AMOUNT_MISMATCH`.
+- **Safe to log:** errors never carry request headers or your secret key.
+- **Sandbox and production:** switch with one `environment` setting. Test credentials are below.
+
+> **Upgrade to 2.0.7 now** (`npm install neppayments@latest`). In 2.0.6 and earlier, a failed Khalti call threw the raw HTTP error, which held your Khalti secret key in its headers. If your app logged errors, check your logs and roll your Khalti key. 2.0.7 is a drop-in update, no code change needed. See the [changelog](CHANGELOG.md).
 
 ## Installation
 
@@ -17,7 +29,7 @@ import { NepPayments } from 'neppayments';
 
 const payments = new NepPayments({
   khalti: {
-    secretKey: 'YOUR_KHALTI_Live secret key_SECRET_KEY', // Obtain from [Khalti Dashboard](https://test-admin.khalti.com/#/settings/keys)
+    secretKey: process.env.KHALTI_SECRET_KEY, // Obtain from [Khalti Dashboard](https://test-admin.khalti.com/#/settings/keys)
     environment: 'sandbox', // or 'production'
   },
   esewa: {
@@ -86,18 +98,24 @@ console.log(esewaPayment.form_html); // Serve this HTML to the client
 ### 4. Verify the Payment (Same for Both)
 
 ```ts
-// Khalti
-const verification = await payments.khalti.verifyPayment({ pidx: 'YOUR_KHALTI_PIDX' });
-console.log(verification);
+// Khalti: pass the amount you charged (paisa). A different amount throws AMOUNT_MISMATCH.
+const verification = await payments.khalti.verifyPayment({
+  pidx: 'YOUR_KHALTI_PIDX',
+  expectedAmount: 1000,
+});
+console.log(verification.status, verification.raw_status);
 
-// eSewa
+// eSewa: expectedAmount is in rupees.
 const verification = await payments.esewa.verifyPayment({
   product_code: 'EPAYTEST',
   transaction_uuid: 'YOUR_TRANSACTION_UUID',
   total_amount: 10,
+  expectedAmount: 10,
 });
 console.log(verification);
 ```
+
+Always verify on your server and pass `expectedAmount`. Only `status === 'COMPLETED'` means paid.
 
 ### 5. Handling Payment Success [KHALTI]
 
@@ -116,7 +134,9 @@ After the user completes the payment, the success response is obtained in the re
 - **purchase_order_name**: The initial purchase_order_name provided during payment initiation.
 - **total_amount**: Same value as the amount.
 
-There is no further step required to complete the payment; however, the merchant can process their own validation and confirmation steps if required. It is recommended that during implementation, the payment lookup API is checked for confirmation after the redirect callback is received.
+**Do not trust these parameters.** Anyone can type them into the URL. Always call `verifyPayment` on your server before you mark an order paid.
+
+**Save the `pidx` when you create the payment, and verify that saved `pidx`, never the one from the return URL.** Khalti's lookup does not return your order id, so this is how you know the payment belongs to this order.
 
 ## Developer Experience
 - The API for both Khalti and eSewa is designed to be as similar as possible.
@@ -124,7 +144,9 @@ There is no further step required to complete the payment; however, the merchant
 - Payment verification is identical for both gateways.
 
 ## Error Handling
-- All methods throw errors with clear messages if something goes wrong (e.g., invalid credentials, network issues, payment not found).
+- Every method throws a `PaymentError` with `message`, `code` and, when the gateway answered, `response: { status, data }`.
+- Errors never carry request headers or your secret key, so they are safe to log.
+- Khalti's `Expired` and `User canceled` lookups are returned as statuses, not thrown.
 
 ## Contributing
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
