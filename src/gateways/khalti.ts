@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isRecord, toPaymentError } from '../utils/httpError';
 import { PaymentError, PaymentErrorCode } from '../types/payment.enums';
 import { 
   KhaltiConfig, 
@@ -8,12 +9,6 @@ import {
   PaymentVerificationResponse
 } from '../types/payment.types';
 
-interface ApiError {
-  error_key?: string;
-  detail?: string;
-  [key: string]: any;
-}
-
 interface KhaltiApiResponse {
   pidx: string;
   payment_url: string;
@@ -21,17 +16,29 @@ interface KhaltiApiResponse {
   expires_in: number;
 }
 
-interface KhaltiVerificationApiResponse {
-  status: string;
-  transaction_id: string;
-  amount: number;
-  [key: string]: any;
+interface KhaltiLookupResponse {
+  pidx?: string;
+  total_amount?: number;
+  amount?: number;
+  status?: string;
+  transaction_id?: string | null;
+  [key: string]: unknown;
 }
 
-function isApiError(error: unknown): error is ApiError {
-  return typeof error === 'object' && error !== null && 
-    ('error_key' in error || 'detail' in error);
-}
+/**
+ * Khalti lookup statuses mapped to the 2.x status values.
+ * Refunded and Partially Refunded keep the old value FAILED; read raw_status to tell them apart.
+ */
+const STATUS_MAP: Record<string, PaymentVerificationResponse['status']> = {
+  'COMPLETED': 'COMPLETED',
+  'PENDING': 'PENDING',
+  'INITIATED': 'PENDING',
+  'EXPIRED': 'EXPIRED',
+  'USER CANCELED': 'CANCELED',
+  'CANCELED': 'CANCELED',
+  'REFUNDED': 'FAILED',
+  'PARTIALLY REFUNDED': 'FAILED'
+};
 
 /**
  * Khalti payment gateway implementation
@@ -47,6 +54,13 @@ export class KhaltiGateway {
     if (!config.secretKey) {
       throw new PaymentError(
         'Khalti secret key is required',
+        PaymentErrorCode.INVALID_CONFIG
+      );
+    }
+
+    if (config.environment !== undefined && config.environment !== 'sandbox' && config.environment !== 'production') {
+      throw new PaymentError(
+        `Khalti environment must be 'sandbox' or 'production', got '${String(config.environment)}'`,
         PaymentErrorCode.INVALID_CONFIG
       );
     }
@@ -151,19 +165,7 @@ export class KhaltiGateway {
         expires_in: data.expires_in
       };
     } catch (error) {
-      if (isApiError(error)) {
-        if (error.error_key === 'validation_error') {
-          throw new PaymentError(
-            Object.values(error).filter(v => typeof v === 'string').join(', '),
-            PaymentErrorCode.VALIDATION_ERROR
-          );
-        }
-        throw new PaymentError(
-          error.detail || 'Failed to create payment',
-          PaymentErrorCode.PAYMENT_FAILED
-        );
-      }
-      throw error;
+      throw toPaymentError(error, 'Failed to create payment', PaymentErrorCode.PAYMENT_FAILED);
     }
   }
 
@@ -173,6 +175,8 @@ export class KhaltiGateway {
    * @returns Payment verification response
    */
   async verifyPayment(options: KhaltiVerificationOptions): Promise<PaymentVerificationResponse> {
+    let payment: KhaltiLookupResponse;
+    let httpStatus = 200;
     try {
       const response = await axios.post(
         `${this.baseUrl}/epayment/lookup/`,
@@ -185,33 +189,37 @@ export class KhaltiGateway {
           }
         }
       );
-
-      const payment = response.data as KhaltiVerificationApiResponse;
-      const allowedStatuses = ['COMPLETED', 'FAILED', 'PENDING', 'EXPIRED', 'CANCELED'] as const;
-      let status = (payment.status || '').toUpperCase();
-      if (!allowedStatuses.includes(status as any)) {
-        status = 'FAILED';
-      }
-      return {
-        status: status as PaymentVerificationResponse['status'],
-        transaction_id: payment.transaction_id,
-        amount: payment.amount,
-        payment_details: payment
-      };
+      payment = response.data as KhaltiLookupResponse;
+      httpStatus = response.status;
     } catch (error) {
-      if (isApiError(error)) {
-        if (error.error_key === 'validation_error') {
-          throw new PaymentError(
-            Object.values(error).filter(v => typeof v === 'string').join(', '),
-            PaymentErrorCode.VALIDATION_ERROR
-          );
-        }
-        throw new PaymentError(
-          error.detail || 'Failed to verify payment',
-          PaymentErrorCode.VERIFICATION_FAILED
-        );
+      // Khalti answers HTTP 400 for Expired and User canceled payments. Those are statuses, not errors.
+      const body = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
+      if (body && body.status === 400 && isRecord(body.data) && typeof body.data.status === 'string') {
+        payment = body.data as KhaltiLookupResponse;
+        httpStatus = 400;
+      } else {
+        throw toPaymentError(error, 'Failed to verify payment', PaymentErrorCode.VERIFICATION_FAILED);
       }
-      throw error;
     }
+
+    const rawStatus = typeof payment.status === 'string' ? payment.status : '';
+    const status = STATUS_MAP[rawStatus.toUpperCase()] || 'FAILED';
+    const amount = (payment.total_amount ?? payment.amount) as number;
+
+    if (options.expectedAmount !== undefined && Number(amount) !== Number(options.expectedAmount)) {
+      throw new PaymentError(
+        `Khalti amount ${String(amount)} does not match the expected amount ${String(options.expectedAmount)} (paisa)`,
+        PaymentErrorCode.AMOUNT_MISMATCH,
+        { status: httpStatus, data: payment }
+      );
+    }
+
+    return {
+      status,
+      transaction_id: payment.transaction_id as string,
+      amount,
+      payment_details: payment,
+      raw_status: rawStatus
+    };
   }
 }

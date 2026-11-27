@@ -1,5 +1,6 @@
 import axios from 'axios';
 import crypto from 'crypto';
+import { toPaymentError } from '../utils/httpError';
 import { PaymentError, PaymentErrorCode } from '../types/payment.enums';
 import { 
   EsewaConfig, 
@@ -12,18 +13,9 @@ import {
 interface StatusCheckResponse {
   product_code: string;
   transaction_uuid: string;
-  total_amount: number;
+  total_amount: number | string;
   status: 'COMPLETE' | 'PENDING' | 'FULL_REFUND' | 'PARTIAL_REFUND' | 'AMBIGUOUS' | 'NOT_FOUND' | 'CANCELED';
   ref_id: string | null;
-}
-
-interface ApiError {
-  code: number;
-  error_message: string;
-}
-
-function isApiError(error: any): error is ApiError {
-  return error && typeof error.code === 'number' && typeof error.error_message === 'string';
 }
 
 /**
@@ -41,6 +33,13 @@ export class EsewaGateway {
     if (!config.productCode || !config.secretKey) {
       throw new PaymentError(
         'eSewa product code and secret key are required',
+        PaymentErrorCode.INVALID_CONFIG
+      );
+    }
+
+    if (config.environment !== undefined && config.environment !== 'sandbox' && config.environment !== 'production') {
+      throw new PaymentError(
+        `eSewa environment must be 'sandbox' or 'production', got '${String(config.environment)}'`,
         PaymentErrorCode.INVALID_CONFIG
       );
     }
@@ -64,8 +63,7 @@ export class EsewaGateway {
       const hmac = crypto.createHmac('sha256', this.config.secretKey);
       hmac.update(data);
       return hmac.digest('base64');
-    } catch (error) {
-      console.error('Error generating signature:', error);
+    } catch {
       throw new PaymentError(
         'Failed to generate payment signature',
         PaymentErrorCode.SIGNATURE_GENERATION_FAILED
@@ -129,27 +127,8 @@ export class EsewaGateway {
         transaction_uuid: options.transaction_uuid,
         signature
       };
-    } catch (error: any) {
-      if (error instanceof PaymentError) {
-        throw error;
-      }
-      
-      // Log the error response for debugging
-      if (error.response) {
-        console.error('eSewa API Error:', error.response.status, error.response.data);
-      } else if (error.request) {
-        console.error('eSewa API No Response:', error.request);
-      } else {
-        console.error('eSewa API Error:', error.message);
-      }
-
-      if (isApiError(error)) {
-        throw new PaymentError(
-          error.error_message || 'Failed to create payment',
-          PaymentErrorCode.PAYMENT_FAILED
-        );
-      }
-      throw new PaymentError('Failed to create payment', PaymentErrorCode.PAYMENT_FAILED);
+    } catch (error) {
+      throw toPaymentError(error, 'Failed to create payment', PaymentErrorCode.PAYMENT_FAILED);
     }
   }
 
@@ -199,24 +178,28 @@ export class EsewaGateway {
           status = 'FAILED';
       }
 
+      if (options.expectedAmount !== undefined && toRupees(payment.total_amount) !== Number(options.expectedAmount)) {
+        throw new PaymentError(
+          `eSewa amount ${String(payment.total_amount)} does not match the expected amount ${String(options.expectedAmount)} (rupees)`,
+          PaymentErrorCode.AMOUNT_MISMATCH,
+          { status: response.status, data: payment }
+        );
+      }
+
       return {
         status,
         transaction_id: payment.ref_id || '',
-        amount: payment.total_amount,
-        payment_details: payment
+        amount: payment.total_amount as number,
+        payment_details: payment,
+        raw_status: payment.status
       };
     } catch (error) {
-      if (error instanceof PaymentError) {
-        throw error;
-      }
-
-      if (isApiError(error)) {
-        throw new PaymentError(
-          error.error_message || 'Failed to verify payment',
-          PaymentErrorCode.VERIFICATION_FAILED
-        );
-      }
-      throw new PaymentError('Failed to verify payment', PaymentErrorCode.VERIFICATION_FAILED);
+      throw toPaymentError(error, 'Failed to verify payment', PaymentErrorCode.VERIFICATION_FAILED);
     }
   }
+}
+
+/** eSewa may format amounts with thousands separators, such as "1,000.0". */
+function toRupees(value: number | string): number {
+  return typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''));
 }
