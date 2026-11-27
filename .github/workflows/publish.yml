@@ -1,11 +1,10 @@
-# Publishes to npm when a version tag is pushed, with npm trusted publishing (OIDC).
-# There is no npm token anywhere: npm trusts this repo and this file name.
-# The same file lives on main (neppayments 2.x) and on the v3 line (nepal-payments),
-# so a tag publishes whichever package the tagged commit's package.json names.
+# Publishes nepal-payments to npm when a version tag is pushed, with npm trusted publishing (OIDC).
+# There is no npm token anywhere: npm trusts this repo, this file name and the environment "npm".
 #
 # To release: set "version" in package.json, add the CHANGELOG section "## <version> (<date>)",
-# commit, then `git tag v<version> && git push origin v<version>`.
+# commit, then `git tag v<version> && git push origin v<version>` (one tag at a time).
 # A version with a "-" (3.1.0-rc.0) goes to the npm tag "next"; any other to "latest".
+# A failed run can be re-run: a version already on npm and a release that exists are skipped.
 name: Publish
 
 on:
@@ -13,7 +12,7 @@ on:
     tags: ['v*']
 
 concurrency:
-  group: publish
+  group: publish-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -27,9 +26,11 @@ jobs:
       contents: write # the GitHub release
       id-token: write # npm trusted publishing and provenance
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
 
@@ -52,26 +53,37 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - run: npm ci
+      # No install scripts run in the job that can mint the publish token.
+      - run: npm ci --ignore-scripts
 
-      - name: Test
-        run: |
-          if node -e "process.exit(require('./package.json').scripts.check?0:1)"; then npm run check; else npm test; fi
+      - run: npm run check
 
       - name: Publish to npm
-        run: npm publish --tag "${{ steps.meta.outputs.dist_tag }}"
+        env:
+          NAME: ${{ steps.meta.outputs.name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          DIST_TAG: ${{ steps.meta.outputs.dist_tag }}
+        run: |
+          if npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
+            echo "${NAME}@${VERSION} is already on npm"
+          else
+            npm publish --tag "$DIST_TAG"
+          fi
 
       - name: GitHub release from the CHANGELOG section
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ steps.meta.outputs.version }}
           NAME: ${{ steps.meta.outputs.name }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
         run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists"
+            exit 0
+          fi
           awk -v v="$VERSION" 'index($0, "## " v " ") == 1 || $0 == "## " v {f=1; next} /^## /{if (f) exit} f' CHANGELOG.md > notes.md
           [ -s notes.md ] || echo "Published ${NAME}@${VERSION}." > notes.md
           flags=()
           [ "$PRERELEASE" = "true" ] && flags+=(--prerelease)
-          # The 2.x line (neppayments) never becomes the repo's newest release.
-          [ "$NAME" = "neppayments" ] && flags+=(--latest=false)
           gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md "${flags[@]}"
