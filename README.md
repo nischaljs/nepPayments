@@ -9,7 +9,7 @@ Accept payments in Nepal with **Khalti** and **eSewa** from one Node.js or TypeS
 
 - **One API for both gateways:** `createPayment` and `verifyPayment` work the same way for Khalti and eSewa.
 - **Amount check:** pass `expectedAmount` and a payment for the wrong amount throws `AMOUNT_MISMATCH`.
-- **Safe to log:** errors never carry request headers or your secret key.
+- **Safe to log:** errors and gateway objects never carry request headers or your secret key.
 - **Sandbox and production:** switch with one `environment` setting. Test credentials are below.
 
 > **Upgrade to 2.0.7 now** (`npm install neppayments@latest`). In 2.0.6 and earlier, a failed Khalti call threw the raw HTTP error, which held your Khalti secret key in its headers. If your app logged errors, check your logs and roll your Khalti key. 2.0.7 is a drop-in update, no code change needed. See the [changelog](CHANGELOG.md).
@@ -145,7 +145,7 @@ After the user completes the payment, the success response is obtained in the re
 
 ## Error Handling
 - Every method throws a `PaymentError` with `message`, `code` and, when the gateway answered, `response: { status, data }`.
-- Errors never carry request headers or your secret key, so they are safe to log.
+- Errors never carry request headers or your secret key, so they are safe to log. The gateway objects keep the key in a private field, so logging them does not show it either.
 - Khalti's `Expired` and `User canceled` lookups are returned as statuses, not thrown.
 
 ## Contributing

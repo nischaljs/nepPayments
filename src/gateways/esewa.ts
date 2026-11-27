@@ -1,6 +1,6 @@
 import axios from 'axios';
 import crypto from 'crypto';
-import { toPaymentError } from '../utils/httpError';
+import { isRecord, toPaymentError } from '../utils/httpError';
 import { PaymentError, PaymentErrorCode } from '../types/payment.enums';
 import { 
   EsewaConfig, 
@@ -24,13 +24,16 @@ interface StatusCheckResponse {
 export class EsewaGateway {
   private readonly baseUrl: string;
   private readonly statusCheckUrl: string;
+  private readonly productCode: string;
+  /** Held in a private field so console.log, util.inspect and JSON.stringify never show it. */
+  readonly #secretKey: string;
 
   /**
    * Create a new eSewa gateway instance
    * @param config eSewa configuration
    */
-  constructor(private readonly config: EsewaConfig) {
-    if (!config.productCode || !config.secretKey) {
+  constructor(config: EsewaConfig) {
+    if (!config || !config.productCode || !config.secretKey) {
       throw new PaymentError(
         'eSewa product code and secret key are required',
         PaymentErrorCode.INVALID_CONFIG
@@ -43,6 +46,9 @@ export class EsewaGateway {
         PaymentErrorCode.INVALID_CONFIG
       );
     }
+
+    this.productCode = config.productCode;
+    this.#secretKey = config.secretKey;
 
     // Set base URLs based on environment
     if (config.environment === 'sandbox') {
@@ -60,7 +66,7 @@ export class EsewaGateway {
    */
   private generateSignature(data: string): string {
     try {
-      const hmac = crypto.createHmac('sha256', this.config.secretKey);
+      const hmac = crypto.createHmac('sha256', this.#secretKey);
       hmac.update(data);
       return hmac.digest('base64');
     } catch {
@@ -77,15 +83,20 @@ export class EsewaGateway {
    * @returns Payment response with form HTML and transaction UUID
    */
   async createPayment(options: EsewaPaymentOptions): Promise<EsewaPaymentResponse> {
-    try {
-      // Validate required fields
-      if (!options.transaction_uuid || !options.total_amount) {
-        throw new PaymentError(
-          'Transaction UUID and total amount are required',
-          PaymentErrorCode.INVALID_PAYMENT_OPTIONS
-        );
-      }
+    if (!isRecord(options) || !options.transaction_uuid || !options.total_amount) {
+      throw new PaymentError(
+        'Transaction UUID and total amount are required',
+        PaymentErrorCode.INVALID_PAYMENT_OPTIONS
+      );
+    }
+    if (typeof options.signed_field_names !== 'string' || options.signed_field_names.trim() === '') {
+      throw new PaymentError(
+        'signed_field_names is required, for example "total_amount,transaction_uuid,product_code"',
+        PaymentErrorCode.INVALID_PAYMENT_OPTIONS
+      );
+    }
 
+    try {
       // Generate signature
       const signedFields = options.signed_field_names.split(',');
       const signatureData = signedFields
@@ -138,20 +149,19 @@ export class EsewaGateway {
    * @returns Payment verification response
    */
   async verifyPayment(options: EsewaVerificationOptions): Promise<PaymentVerificationResponse> {
-    try {
-      // Validate required fields
-      if (!options.transaction_uuid || !options.total_amount) {
-        throw new PaymentError(
-          'Transaction UUID and total amount are required for verification',
-          PaymentErrorCode.INVALID_VERIFICATION_OPTIONS
-        );
-      }
+    if (!isRecord(options) || !options.transaction_uuid || !options.total_amount) {
+      throw new PaymentError(
+        'Transaction UUID and total amount are required for verification',
+        PaymentErrorCode.INVALID_VERIFICATION_OPTIONS
+      );
+    }
 
+    try {
       const response = await axios.get<StatusCheckResponse>(
         this.statusCheckUrl,
         {
           params: {
-            product_code: this.config.productCode,
+            product_code: this.productCode,
             transaction_uuid: options.transaction_uuid,
             total_amount: options.total_amount
           }
@@ -167,6 +177,9 @@ export class EsewaGateway {
           status = 'COMPLETED';
           break;
         case 'PENDING':
+        case 'AMBIGUOUS':
+          // AMBIGUOUS means eSewa has not settled the payment yet. Treat it as
+          // pending, not failed, so the buyer is not asked to pay twice.
           status = 'PENDING';
           break;
         case 'FULL_REFUND':
@@ -175,15 +188,26 @@ export class EsewaGateway {
           status = 'CANCELED';
           break;
         default:
+          // NOT_FOUND and any status eSewa adds later.
           status = 'FAILED';
       }
 
-      if (options.expectedAmount !== undefined && toRupees(payment.total_amount) !== Number(options.expectedAmount)) {
-        throw new PaymentError(
-          `eSewa amount ${String(payment.total_amount)} does not match the expected amount ${String(options.expectedAmount)} (rupees)`,
-          PaymentErrorCode.AMOUNT_MISMATCH,
-          { status: response.status, data: payment }
-        );
+      // Only a completed payment has an amount worth checking.
+      if (options.expectedAmount !== undefined && status === 'COMPLETED') {
+        if (typeof payment.total_amount !== 'number' && typeof payment.total_amount !== 'string') {
+          throw new PaymentError(
+            'eSewa marked the payment complete but sent no amount, so it cannot be checked against the expected amount',
+            PaymentErrorCode.INVALID_RESPONSE,
+            { status: response.status, data: payment }
+          );
+        }
+        if (toRupees(payment.total_amount) !== Number(options.expectedAmount)) {
+          throw new PaymentError(
+            `eSewa amount ${String(payment.total_amount)} does not match the expected amount ${String(options.expectedAmount)} (rupees)`,
+            PaymentErrorCode.AMOUNT_MISMATCH,
+            { status: response.status, data: payment }
+          );
+        }
       }
 
       return {
