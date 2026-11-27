@@ -38,11 +38,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nischaljs/nepPayments.git"
+    "url": "git+https://github.com/nischaljs/nepal-payments.git"
   },
-  "homepage": "https://github.com/nischaljs/nepPayments#readme",
+  "homepage": "https://github.com/nischaljs/nepal-payments#readme",
   "bugs": {
-    "url": "https://github.com/nischaljs/nepPayments/issues"
+    "url": "https://github.com/nischaljs/nepal-payments/issues"
   },
   "type": "commonjs",
   "main": "./dist/index.js",
