@@ -17,5 +17,5 @@
     "noFallthroughCasesInSwitch": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "tsup.config.ts"]
+  "include": ["src/**/*", "test/types/**/*", "tsup.config.ts"]
 }
