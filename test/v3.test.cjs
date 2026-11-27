@@ -353,6 +353,13 @@ test('hamropay: webhook accept and reject', async () => {
   const asText = hamroPayWebhook({ orderId: 'o-1', merchantId: '12345', amount: rupees(10), webhookSecret: HAMRO.webhookSecret });
   const asNumber = { body: asText.body.replace('"merchantId":"12345"', '"merchantId":12345'), signature: asText.signature };
   assert.equal((await numeric.hamropay.parseCallback(asNumber)).status, 'paid');
+  // A signed webhook that says paid but has an amount this library cannot read fails verify.
+  const fakeHp = fakeHamroPay();
+  const hp = createPayments({ mode: 'sandbox', fetch: fakeFetch(fakeHp.handler), hamropay: HAMRO });
+  const odd = await hp.hamropay.parseCallback(hamroPayWebhook({ orderId: 'o-1', merchantId: HAMRO.merchantId, amount: rupees(10), webhookSecret: HAMRO.webhookSecret, amountText: '10.005' }));
+  assert.deepEqual({ signed: odd.signed, status: odd.status, amount: odd.amount }, { signed: true, status: 'paid', amount: null });
+  const oddErr = await rejects(hp.hamropay.verify({ ref: 'o-1', expectedAmount: rupees(10), expectedOrderId: 'o-1', callback: odd }), 'INVALID_RESPONSE');
+  assert.match(oddErr.message, /signed hamropay callback says paid with no amount/);
   const noHook = createPayments({ mode: 'sandbox', hamropay: { ...HAMRO, webhookSecret: undefined } });
   await rejects(noHook.hamropay.parseCallback(good), 'INVALID_CONFIG');
   const redirect = await p.hamropay.parseCallback('https://shop.example/s?MerchantTxnId=o-1');

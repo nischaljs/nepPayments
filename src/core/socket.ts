@@ -197,7 +197,10 @@ export function connect<C, E, S, I, CB, SI, RI>(
     if (cb.orderId !== null && cb.orderId !== input.expectedOrderId) {
       fail({ code: 'ORDER_MISMATCH', message: `The signed ${gateway} callback names order ${JSON.stringify(cb.orderId)}, but you expected ${JSON.stringify(input.expectedOrderId)}. Do not ship this order.` });
     }
-    if (cb.amount === null) return false;
+    if (cb.amount === null) {
+      if (cb.status === 'paid') fail({ code: 'INVALID_RESPONSE', message: `The signed ${gateway} callback says paid with no amount; cannot check it.` });
+      return false;
+    }
     if (cb.amount !== input.expectedAmount) {
       fail({ code: 'AMOUNT_MISMATCH', message: `The signed ${gateway} callback says ${cb.amount} paisa for ref ${input.ref}, but you expected ${input.expectedAmount} paisa. Do not ship this order.` });
     }
