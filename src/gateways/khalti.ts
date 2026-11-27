@@ -85,10 +85,14 @@ export class KhaltiGateway {
     }
 
     // Validate amount
-    if (typeof options.amount !== 'number' || !Number.isFinite(options.amount)) {
+    // A numeric string (as from a form body) is accepted, as in 2.0.7, and sent unchanged.
+    const raw: unknown = options.amount;
+    const amount =
+      typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN;
+    if (!Number.isFinite(amount)) {
       throw new PaymentError('Amount must be a number in paisa', PaymentErrorCode.INVALID_AMOUNT);
     }
-    if (options.amount < 1000) {
+    if (amount < 1000) {
       throw new PaymentError(
         'Amount should be greater than Rs. 10 (1000 paisa)',
         PaymentErrorCode.INVALID_AMOUNT
@@ -114,12 +118,12 @@ export class KhaltiGateway {
     }
 
     // Validate amount breakdown if provided
-    if (options.amount_breakdown !== undefined) {
+    if (options.amount_breakdown != null) {
       if (!Array.isArray(options.amount_breakdown) || !options.amount_breakdown.every(isRecord)) {
         throw new PaymentError('amount_breakdown must be an array of { label, amount }', PaymentErrorCode.INVALID_PAYMENT_OPTIONS);
       }
       const total = options.amount_breakdown.reduce((sum, item) => sum + item.amount, 0);
-      if (total !== options.amount) {
+      if (total !== amount) {
         throw new PaymentError(
           'Sum of amount_breakdown amounts must equal the total amount',
           PaymentErrorCode.INVALID_AMOUNT
@@ -128,7 +132,7 @@ export class KhaltiGateway {
     }
 
     // Validate product details if provided
-    if (options.product_details !== undefined) {
+    if (options.product_details != null) {
       if (!Array.isArray(options.product_details) || !options.product_details.every(isRecord)) {
         throw new PaymentError('product_details must be an array of products', PaymentErrorCode.INVALID_PAYMENT_OPTIONS);
       }

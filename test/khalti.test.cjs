@@ -181,6 +181,21 @@ test('bad createPayment input throws a validation code and sends nothing', async
   }
 });
 
+test('input that 2.0.7 sent still goes to Khalti unchanged', async () => {
+  const fake = await startFake({
+    'POST /epayment/initiate/': () => ({ status: 200, body: { pidx: 'p1', payment_url: 'https://pay.example/p1' } })
+  });
+  try {
+    const gw = gateway(fake.base);
+    await gw.createPayment({ ...order, amount: String(order.amount) });
+    await gw.createPayment({ ...order, amount_breakdown: null, product_details: null });
+    assert.equal(fake.calls.length, 2);
+    assert.equal(JSON.parse(fake.calls[0].body).amount, String(order.amount));
+  } finally {
+    await fake.close();
+  }
+});
+
 test('an error that is not an HTTP error gets the fallback code, not NETWORK_ERROR', () => {
   const { toPaymentError } = require('../dist/utils/httpError');
   const err = toPaymentError(new TypeError(`bad ${SECRET}`), 'Failed to create payment', 'PAYMENT_FAILED');

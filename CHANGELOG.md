@@ -18,17 +18,18 @@ Fixes from the 2.0.7 review. The public API is the same.
   input before any request: eSewa without `signed_field_names` and Khalti with
   a `product_details` or `amount_breakdown` that is not an array throw
   `INVALID_PAYMENT_OPTIONS`; a Khalti amount that is not a number throws
-  `INVALID_AMOUNT`.
-- Only a request that got no answer gives `NETWORK_ERROR` or
-  `REQUEST_TIMEOUT`. Any other error gets the method's own code
+  `INVALID_AMOUNT`. A numeric string amount and a `null` `amount_breakdown` or
+  `product_details` still work, as in 2.0.7.
+- Only an HTTP client error with no response (no answer, a timeout, a bad URL
+  or a cancelled request) gives `NETWORK_ERROR` or `REQUEST_TIMEOUT`. Any other error gets the method's own code
   (`PAYMENT_FAILED` or `VERIFICATION_FAILED`).
 - The secret key is no longer a property of the gateway object, so
-  `console.log(gateway)` and `JSON.stringify(gateway)` do not show it.
+  `console.log(gateway)` and `JSON.stringify(gateway)` do not show it. The
+  `config` field is gone at runtime too (it was already private in the types).
 - Khalti `transaction_id` is `''` when Khalti sends `null`, as with eSewa.
 - A completed payment with no amount in the gateway's answer and
   `expectedAmount` set throws `INVALID_RESPONSE` with a clear message (was
   `AMOUNT_MISMATCH` against `NaN`).
-- Removed the unused `src/types/payment.errors.ts`.
 
 ## 2.0.7 (2026-11-27)
 
