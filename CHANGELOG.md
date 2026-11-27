@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.0-rc.1 (2026-11-27)
+
+- A full README: quick start per gateway, safe defaults, mock mode and tests, migrating from `neppayments` 2.x, and notes for coding agents. With a demo GIF and an architecture picture (not in the package).
+- The package description and keywords say what the package does.
+
 ## 3.0.0-rc.0 (2026-11-27)
 
 New package name: `nepal-payments` (was `neppayments`). Release candidate.
