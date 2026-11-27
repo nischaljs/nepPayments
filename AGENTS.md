@@ -10,3 +10,11 @@ Read these before you write payment code with this package.
 6. **Test without keys.** Use `mode: 'mock'` for local runs and demos (refused when `NODE_ENV` is `production`; a mock ref works only in the process that made it), and `nepal-payments/testing` (`fakeFetch`, `fakeKhalti`, `fakeEsewa`, `fakeConnectIps`, `fakeHamroPay`) in tests. Tests must never call a sandbox or live host.
 
 Docs per gateway: `docs/khalti.md`, `docs/esewa.md`, `docs/connectips.md`, `docs/hamropay.md`. Recipes: `docs/express.md`, `docs/nextjs.md`, `docs/nestjs.md`.
+
+## Releasing
+
+Only GitHub Actions publishes (`.github/workflows/publish.yml`, npm trusted publishing, no token).
+
+1. Set `version` in `package.json`, add `## <version> (<date>)` to `CHANGELOG.md`, and change the pinned tag in the README links to `v<version>`.
+2. Commit, then `git tag v<version> && git push origin v<version>`.
+3. The workflow checks the tag matches the version, runs the checks, publishes (a version with `-` goes to the npm tag `next`, any other to `latest`) and creates the GitHub release from the CHANGELOG section.

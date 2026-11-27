@@ -1,0 +1,77 @@
+# Publishes to npm when a version tag is pushed, with npm trusted publishing (OIDC).
+# There is no npm token anywhere: npm trusts this repo and this file name.
+# The same file lives on main (neppayments 2.x) and on the v3 line (nepal-payments),
+# so a tag publishes whichever package the tagged commit's package.json names.
+#
+# To release: set "version" in package.json, add the CHANGELOG section "## <version> (<date>)",
+# commit, then `git tag v<version> && git push origin v<version>`.
+# A version with a "-" (3.1.0-rc.0) goes to the npm tag "next"; any other to "latest".
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: write # the GitHub release
+      id-token: write # npm trusted publishing and provenance
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - name: Check the tag matches package.json and npm is new enough
+        id: meta
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+            exit 1
+          fi
+          # Trusted publishing needs npm 11.5.1 or newer.
+          node -e "const [a,b,c]=process.argv[1].split('.').map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)" "$(npm --version)" \
+            || { echo "::error::npm $(npm --version) is older than 11.5.1"; exit 1; }
+          case "$version" in
+            *-*) echo "dist_tag=next" >> "$GITHUB_OUTPUT"; echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "dist_tag=latest" >> "$GITHUB_OUTPUT"; echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+
+      - name: Test
+        run: |
+          if node -e "process.exit(require('./package.json').scripts.check?0:1)"; then npm run check; else npm test; fi
+
+      - name: Publish to npm
+        run: npm publish --tag "${{ steps.meta.outputs.dist_tag }}"
+
+      - name: GitHub release from the CHANGELOG section
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          NAME: ${{ steps.meta.outputs.name }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+        run: |
+          awk -v v="$VERSION" 'index($0, "## " v " ") == 1 || $0 == "## " v {f=1; next} /^## /{if (f) exit} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Published ${NAME}@${VERSION}." > notes.md
+          flags=()
+          [ "$PRERELEASE" = "true" ] && flags+=(--prerelease)
+          # The 2.x line (neppayments) never becomes the repo's newest release.
+          [ "$NAME" = "neppayments" ] && flags+=(--latest=false)
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md "${flags[@]}"
