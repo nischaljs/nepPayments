@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 680" width="960" height="680" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">How nepal-payments is built</title>
+  <desc id="d">Your server code imports one of four entries: nepal-payments with createPayments, a single gateway subpath such as nepal-payments/khalti, nepal-payments/compat with the 2.x NepPayments class, or nepal-payments/testing with fakes. The gateway plugs, Khalti, eSewa, ConnectIPS and Hamro Pay, are opt-in: only the ones you configure exist. ConnectIPS and Hamro Pay are experimental. Every plug sits in one socket, src/core, which sends requests over fetch with a timeout and no retries, removes secrets, signs, checks verify's amount, order id and signed callback, and runs mock mode with no network. The socket talks to the gateway hosts, or in tests to the fakes from nepal-payments/testing.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrow-app" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6e56cf"/>
+    </marker>
+    <g id="plug">
+      <!-- cable, plug body, two prongs -->
+      <line x1="0" y1="0" x2="0" y2="14" stroke="#0b7a75" stroke-width="3"/>
+      <rect x="-14" y="14" width="28" height="14" rx="3" fill="#0b7a75"/>
+      <rect x="-9" y="28" width="5" height="9" rx="1" fill="#0b7a75"/>
+      <rect x="4" y="28" width="5" height="9" rx="1" fill="#0b7a75"/>
+    </g>
+    <g id="slot">
+      <rect x="-9" y="0" width="5" height="9" rx="1" fill="#7a3e00"/>
+      <rect x="4" y="0" width="5" height="9" rx="1" fill="#7a3e00"/>
+    </g>
+  </defs>
+
+  <style>
+    .h { font-size: 15px; font-weight: 700; fill: #1f2328; }
+    .s { font-size: 12.5px; fill: #424a53; }
+    .m { font-size: 11.5px; fill: #57606a; }
+    .x { font-size: 11px; font-weight: 600; fill: #9a6700; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .entry rect { fill: #efeafd; stroke: #6e56cf; stroke-width: 1.5; }
+    .plug rect { fill: #ffffff; stroke: #0b7a75; stroke-width: 1.5; }
+    .out rect { fill: #f6f8fa; stroke: #8c959f; stroke-width: 1; }
+  </style>
+
+  <!-- light panel so it reads the same on light and dark GitHub themes -->
+  <rect x="2" y="2" width="956" height="676" rx="18" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+
+  <text x="32" y="40" style="font-size:20px;font-weight:700;fill:#1f2328">How nepal-payments is built</text>
+  <text x="32" y="62" class="s">A socket and plugs. The socket does the same safe work for every gateway. A plug only speaks its gateway's language.</text>
+
+  <!-- your code -->
+  <rect x="330" y="80" width="300" height="46" rx="10" fill="#ffffff" stroke="#6e56cf" stroke-width="1.5"/>
+  <text x="480" y="101" text-anchor="middle" class="h">Your server code</text>
+  <text x="480" y="118" text-anchor="middle" class="m">Express, Next.js Route Handlers, NestJS, any Node 18+</text>
+
+  <!-- app -> entries -->
+  <g stroke="#6e56cf" stroke-width="1.6" fill="none" marker-end="url(#arrow-app)">
+    <path d="M400 126 L145 166"/>
+    <path d="M450 126 L375 166"/>
+    <path d="M510 126 L605 166"/>
+    <path d="M560 126 L825 166"/>
+  </g>
+
+  <!-- entries -->
+  <g class="entry">
+    <rect x="40" y="168" width="210" height="58" rx="10"/>
+    <rect x="270" y="168" width="210" height="58" rx="10"/>
+    <rect x="500" y="168" width="210" height="58" rx="10"/>
+    <rect x="730" y="168" width="190" height="58" rx="10"/>
+  </g>
+  <text x="145" y="192" text-anchor="middle" class="s code" style="font-weight:600">nepal-payments</text>
+  <text x="145" y="212" text-anchor="middle" class="m code">createPayments({ … })</text>
+  <text x="375" y="192" text-anchor="middle" class="s code" style="font-weight:600">nepal-payments/khalti</text>
+  <text x="375" y="212" text-anchor="middle" class="m">or /esewa, /connectips, /hamropay</text>
+  <text x="605" y="192" text-anchor="middle" class="s code" style="font-weight:600">nepal-payments/compat</text>
+  <text x="605" y="212" text-anchor="middle" class="m">the 2.x NepPayments class</text>
+  <text x="825" y="192" text-anchor="middle" class="s code" style="font-weight:600">nepal-payments/testing</text>
+  <text x="825" y="212" text-anchor="middle" class="m">fakes for your tests</text>
+
+  <!-- entries -> plugs -->
+  <g stroke="#57606a" stroke-width="1.5" fill="none" marker-end="url(#arrow)">
+    <path d="M145 226 L145 282"/>
+    <path d="M375 226 L375 282"/>
+  </g>
+  <text x="156" y="252" class="m"><tspan style="font-weight:600;fill:#1f2328">Plugs</tspan> <tspan class="code">src/gateways/&lt;name&gt;</tspan></text>
+  <text x="156" y="268" class="m">opt-in: only what you configure</text>
+
+  <!-- plugs -->
+  <g class="plug">
+    <rect x="40" y="286" width="120" height="54" rx="10"/>
+    <rect x="173" y="286" width="120" height="54" rx="10"/>
+    <rect x="306" y="286" width="120" height="54" rx="10"/>
+    <rect x="439" y="286" width="120" height="54" rx="10"/>
+  </g>
+  <text x="100" y="318" text-anchor="middle" class="h">Khalti</text>
+  <text x="233" y="318" text-anchor="middle" class="h">eSewa</text>
+  <text x="366" y="310" text-anchor="middle" class="h">ConnectIPS</text>
+  <text x="366" y="328" text-anchor="middle" class="x">experimental</text>
+  <text x="499" y="310" text-anchor="middle" class="h">Hamro Pay</text>
+  <text x="499" y="328" text-anchor="middle" class="x">experimental</text>
+
+  <line x1="100" y1="340" x2="100" y2="368" stroke="#0b7a75" stroke-width="3"/><use href="#plug" x="100" y="364"/>
+  <line x1="233" y1="340" x2="233" y2="368" stroke="#0b7a75" stroke-width="3"/><use href="#plug" x="233" y="364"/>
+  <line x1="366" y1="340" x2="366" y2="368" stroke="#0b7a75" stroke-width="3"/><use href="#plug" x="366" y="364"/>
+  <line x1="499" y1="340" x2="499" y2="368" stroke="#0b7a75" stroke-width="3"/><use href="#plug" x="499" y="364"/>
+
+  <!-- compat -> socket -->
+  <path d="M605 226 L605 392" stroke="#57606a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <text x="614" y="372" class="m">Khalti and eSewa,</text>
+  <text x="614" y="386" class="m">2.0.7 API on the v3 core</text>
+
+  <!-- socket -->
+  <rect x="40" y="396" width="720" height="140" rx="12" fill="#fff1e5" stroke="#b35c00" stroke-width="1.5"/>
+  <use href="#slot" x="100" y="396"/>
+  <use href="#slot" x="233" y="396"/>
+  <use href="#slot" x="366" y="396"/>
+  <use href="#slot" x="499" y="396"/>
+  <text x="60" y="428" class="h">Socket</text>
+  <text x="120" y="428" class="m code">src/core</text>
+  <text x="200" y="428" class="m">the same for every gateway</text>
+  <g class="s">
+    <text x="60" y="454">• fetch with a timeout (15 s), one try, no retries</text>
+    <text x="60" y="476">• secrets removed from every error and result</text>
+    <text x="60" y="498">• HMAC and RSA signing, the .pfx reader</text>
+    <text x="60" y="520">• amounts in integer paisa</text>
+    <text x="410" y="454">• verify checks amount, order id, signed callback</text>
+    <text x="410" y="476">• one error type, <tspan class="code">PaymentError</tspan>, with a code</text>
+    <text x="410" y="498">• config checks that name the field to fix</text>
+    <text x="410" y="520">• <tspan class="code">mode: 'mock'</tspan>: no keys, no network</text>
+  </g>
+
+  <!-- testing -> fakes -->
+  <path d="M825 226 L825 576" stroke="#57606a" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- socket -> outside -->
+  <path d="M300 536 L300 576" stroke="#57606a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <text x="310" y="562" class="m">sandbox or live</text>
+  <path d="M700 536 L700 576" stroke="#57606a" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arrow)"/>
+  <text x="710" y="562" class="m">in tests</text>
+
+  <g class="out">
+    <rect x="40" y="580" width="520" height="66" rx="10"/>
+    <rect x="600" y="580" width="320" height="66" rx="10"/>
+  </g>
+  <text x="300" y="606" text-anchor="middle" class="h">Gateway hosts</text>
+  <text x="300" y="628" text-anchor="middle" class="m">Khalti · eSewa · connectIPS (NCHL) · Hamro Pay</text>
+  <text x="760" y="606" text-anchor="middle" class="h">Fake gateways</text>
+  <text x="760" y="628" text-anchor="middle" class="m code">fakeFetch(fakeKhalti().handler)</text>
+</svg>
