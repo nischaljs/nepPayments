@@ -2,7 +2,7 @@
 
 ## 3.0.0-rc.0 (2026-11-27)
 
-New package name: `nepal-payments` (was `nep-payments`). Release candidate.
+New package name: `nepal-payments` (was `neppayments`). Release candidate.
 
 ### Added
 

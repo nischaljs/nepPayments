@@ -35,7 +35,7 @@ One typed API for Nepal's payment gateways. Server only. Node 18 or later.
 - `import { fakeFetch, fakeKhalti, fakeEsewa, fakeConnectIps, fakeHamroPay, esewaCallback, hamroPayWebhook } from 'nepal-payments/testing'`, then `createPayments({ mode: 'sandbox', fetch: fakeFetch(fake.handler), ... })`. `fake.set(ref, { status, amount })` sets what the gateway reports. The handlers also work with MSW.
 - Never call a real sandbox or live host from a test.
 
-## Upgrading from nep-payments 2.x
+## Upgrading from neppayments 2.x
 
 `import { NepPayments } from 'nepal-payments/compat'` keeps the 2.0.7 API. Move each call to `createPayments` when you can.
 
