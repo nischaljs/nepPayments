@@ -228,6 +228,17 @@ for (const raw of ['Expired', 'User canceled', 'Pending']) {
   });
 }
 
+test('a lookup answered with a null body throws INVALID_RESPONSE, not a TypeError', async () => {
+  const fake = await startFake({ 'POST /epayment/lookup/': () => ({ status: 200, body: null }) });
+  try {
+    const err = await caught(gateway(fake.base).verifyPayment({ pidx: 'P1' }));
+    assertNoSecret(err);
+    assert.equal(err.code, 'INVALID_RESPONSE');
+  } finally {
+    await fake.close();
+  }
+});
+
 test('expectedAmount with Completed and no amount throws INVALID_RESPONSE', async () => {
   const body = { pidx: 'P1', status: 'Completed', transaction_id: 'T1' };
   const fake = await startFake({ 'POST /epayment/lookup/': () => ({ status: 200, body }) });

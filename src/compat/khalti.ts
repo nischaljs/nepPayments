@@ -153,6 +153,13 @@ export class KhaltiGateway {
       if (res.status === 400 && !(isRecord(res.data) && typeof res.data.status === 'string')) {
         throw responseError(res.status, res.data, 'Failed to verify payment', PaymentErrorCode.VERIFICATION_FAILED);
       }
+      if (!isRecord(res.data)) {
+        throw new PaymentError(
+          'Khalti answered the lookup with no payment object',
+          PaymentErrorCode.INVALID_RESPONSE,
+          { status: res.status, data: res.data }
+        );
+      }
       payment = res.data as KhaltiLookupResponse;
       httpStatus = res.status;
     } catch (error) {
