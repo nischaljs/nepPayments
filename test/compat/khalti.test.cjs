@@ -204,6 +204,20 @@ test('an error that is not a request error gets the method code, not NETWORK_ERR
   assert.equal(err.message, 'Failed to verify payment: unexpected TypeError');
 });
 
+test('a body that cannot be sent gets PAYMENT_FAILED, not NETWORK_ERROR, and sends nothing', async () => {
+  const fake = await startFake({ 'POST /epayment/initiate/': () => ({ status: 200, body: {} }) });
+  try {
+    const extra = {};
+    extra.self = extra;
+    const err = await caught(gateway(fake.base).createPayment({ ...order, merchant_extra: extra }));
+    assertNoSecret(err);
+    assert.equal(err.code, 'PAYMENT_FAILED');
+    assert.equal(fake.calls.length, 0);
+  } finally {
+    await fake.close();
+  }
+});
+
 test('the secret key never shows on the gateway object', () => {
   const payments = new NepPayments({ khalti: { secretKey: SECRET } });
   for (const value of [payments.khalti, payments]) {

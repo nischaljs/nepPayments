@@ -16,10 +16,16 @@ export class CompatHttp {
     try {
       res = await this.http.send(req);
     } catch (err) {
+      // NETWORK_ERROR and REQUEST_TIMEOUT only when a request went out and no answer came (the 2.0.8 rule).
       if (isPaymentError(err) && err.code === 'TIMEOUT') {
         throw new PaymentError(`${fallbackMessage}: the request timed out`, PaymentErrorCode.REQUEST_TIMEOUT);
       }
-      throw new PaymentError(`${fallbackMessage}: no response from the gateway`, PaymentErrorCode.NETWORK_ERROR);
+      if (isPaymentError(err) && err.code === 'NETWORK_ERROR') {
+        throw new PaymentError(`${fallbackMessage}: no response from the gateway`, PaymentErrorCode.NETWORK_ERROR);
+      }
+      // Nothing was sent (no fetch, a body that cannot be turned into JSON): the method's own code.
+      if (isPaymentError(err)) throw new PaymentError(`${fallbackMessage}: ${err.message}`, fallbackCode);
+      throw err;
     }
     if (!okStatus(res.status)) throw responseError(res.status, res.data, fallbackMessage, fallbackCode);
     return res;
