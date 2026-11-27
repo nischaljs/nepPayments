@@ -12,11 +12,13 @@ Nepal payment gateways for Node.js and TypeScript. One API, zero runtime depende
 
 ## Verify your first payment locally
 
-Install the v3 release candidate in a Node.js 18+ server project.
+Install the current seven-gateway build in a Node.js 18+ server project with Git available.
 
 ```sh
-npm install nepal-payments@next
+npm install github:nischaljs/nepal-payments#main
 ```
+
+For the published four-gateway release candidate, use `npm install nepal-payments@next`.
 
 Save this as `checkout.mjs` and run **`node checkout.mjs`**. It runs entirely on your machine with no account, keys, or network requests.
 

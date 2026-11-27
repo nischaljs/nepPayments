@@ -213,7 +213,7 @@
     "test": "npm run build && node --test test/*.test.cjs test/compat/*.test.cjs",
     "test:pack": "npm run build && node --test test/pack/*.test.cjs",
     "check": "npm run typecheck && npm run depcheck && npm test && npm run test:pack",
-    "prepack": "npm run build",
+    "prepare": "npm run build",
     "demo:payments": "npm run build && node examples/try-payment.mjs"
   },
   "devDependencies": {

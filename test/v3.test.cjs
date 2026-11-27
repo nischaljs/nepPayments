@@ -145,7 +145,14 @@ test('network errors and timeouts are safe PaymentErrors', async () => {
   const slow = createPayments({
     mode: 'sandbox',
     timeoutMs: 50,
-    fetch: (_u, init) => new Promise((_r, rej) => init.signal.addEventListener('abort', () => rej(init.signal.reason))),
+    fetch: (_u, init) => new Promise((resolve, reject) => {
+      // A real request keeps the event loop alive while Node's unref'ed abort timer runs.
+      const response = setTimeout(() => resolve(new Response('{}')), 1000);
+      init.signal.addEventListener('abort', () => {
+        clearTimeout(response);
+        reject(init.signal.reason);
+      }, { once: true });
+    }),
     khalti: { secretKey: KHALTI_SECRET }
   });
   await rejects(slow.khalti.verify({ ref: 'x', expectedAmount: rupees(10), expectedOrderId: 'o' }), 'TIMEOUT');
