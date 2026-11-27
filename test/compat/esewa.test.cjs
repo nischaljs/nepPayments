@@ -93,7 +93,7 @@ const statuses = [
   ['FULL_REFUND', 'CANCELED'],
   ['PARTIAL_REFUND', 'CANCELED'],
   ['CANCELED', 'CANCELED'],
-  ['AMBIGUOUS', 'FAILED'],
+  ['AMBIGUOUS', 'PENDING'],
   ['NOT_FOUND', 'FAILED']
 ];
 
@@ -150,4 +150,69 @@ test('environment must be sandbox or production', () => {
   const base = { productCode: PRODUCT, secretKey: SECRET, successUrl: 'https://e.com/ok', failureUrl: 'https://e.com/f' };
   assert.throws(() => new NepPayments({ esewa: { ...base, environment: 'test' } }), { code: 'INVALID_CONFIG' });
   assert.doesNotThrow(() => new NepPayments({ esewa: { ...base, environment: 'sandbox' } }));
+});
+
+test('createPayment without signed_field_names throws INVALID_PAYMENT_OPTIONS and sends nothing', async () => {
+  const fake = await startFake({ 'POST /form': () => ({ status: 200, body: '<form></form>' }) });
+  try {
+    const gw = gateway(fake.base);
+    for (const input of [{ transaction_uuid: 'u', total_amount: 10 }, { ...order, signed_field_names: ' ' }, null]) {
+      const err = await caught(gw.createPayment(input));
+      assertNoSecret(err);
+      assert.equal(err.code, 'INVALID_PAYMENT_OPTIONS');
+    }
+    assert.equal(fake.calls.length, 0);
+  } finally {
+    await fake.close();
+  }
+});
+
+test('the secret key never shows on the gateway object', () => {
+  const payments = new NepPayments({
+    esewa: { productCode: PRODUCT, secretKey: SECRET, environment: 'sandbox', successUrl: 'https://e.com/ok', failureUrl: 'https://e.com/f' }
+  });
+  for (const value of [payments.esewa, payments]) {
+    for (const text of [util.inspect(value, { depth: 10, showHidden: true }), JSON.stringify(value), String(value)]) {
+      assert.ok(!text.includes(SECRET), `secret shown in: ${text.slice(0, 200)}`);
+    }
+  }
+  assert.equal(payments.esewa.secretKey, undefined);
+});
+
+for (const raw of ['PENDING', 'AMBIGUOUS', 'NOT_FOUND', 'CANCELED']) {
+  test(`expectedAmount with status ${raw} and no amount returns the status`, async () => {
+    const body = { product_code: PRODUCT, transaction_uuid: 'u1', status: raw, ref_id: null };
+    const fake = await startFake({ 'GET /status/': () => ({ status: 200, body }) });
+    try {
+      const res = await gateway(fake.base).verifyPayment({ product_code: PRODUCT, transaction_uuid: 'u1', total_amount: 100, expectedAmount: 100 });
+      assert.equal(res.raw_status, raw);
+      assert.equal(res.transaction_id, '');
+    } finally {
+      await fake.close();
+    }
+  });
+}
+
+test('expectedAmount with a different amount on a pending payment returns the status', async () => {
+  const body = { product_code: PRODUCT, transaction_uuid: 'u1', total_amount: 5, status: 'PENDING', ref_id: null };
+  const fake = await startFake({ 'GET /status/': () => ({ status: 200, body }) });
+  try {
+    const res = await gateway(fake.base).verifyPayment({ product_code: PRODUCT, transaction_uuid: 'u1', total_amount: 100, expectedAmount: 100 });
+    assert.equal(res.status, 'PENDING');
+  } finally {
+    await fake.close();
+  }
+});
+
+test('expectedAmount with COMPLETE and no amount throws INVALID_RESPONSE', async () => {
+  const body = { product_code: PRODUCT, transaction_uuid: 'u1', status: 'COMPLETE', ref_id: 'R1' };
+  const fake = await startFake({ 'GET /status/': () => ({ status: 200, body }) });
+  try {
+    const err = await caught(gateway(fake.base).verifyPayment({ product_code: PRODUCT, transaction_uuid: 'u1', total_amount: 100, expectedAmount: 100 }));
+    assertNoSecret(err);
+    assert.equal(err.code, 'INVALID_RESPONSE');
+    assert.match(err.message, /no amount/);
+  } finally {
+    await fake.close();
+  }
 });

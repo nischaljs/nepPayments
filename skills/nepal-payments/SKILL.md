@@ -37,7 +37,7 @@ One typed API for Nepal's payment gateways. Server only. Node 18 or later.
 
 ## Upgrading from neppayments 2.x
 
-`import { NepPayments } from 'nepal-payments/compat'` keeps the 2.0.7 API. Move each call to `createPayments` when you can.
+`import { NepPayments } from 'nepal-payments/compat'` keeps the 2.0.8 API. Move each call to `createPayments` when you can.
 
 ## Docs
 

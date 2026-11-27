@@ -255,7 +255,7 @@ Also `fakeEsewa`, `fakeConnectIps`, `fakeHamroPay`, and `esewaCallback()` and `h
 
 ## Migrating from `neppayments` 2.x
 
-The package has a new name: `nepal-payments`. To upgrade without changing your code, import the old class from `nepal-payments/compat`. It keeps the 2.0.7 API and outputs, including the 2.x status names.
+The package has a new name: `nepal-payments`. To upgrade without changing your code, import the old class from `nepal-payments/compat`. It keeps the 2.0.8 API and outputs, including the 2.x status names.
 
 ```ts
 // before

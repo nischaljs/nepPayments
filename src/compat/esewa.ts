@@ -1,6 +1,6 @@
 import { hmacSha256 } from '../core';
 import { ESEWA_ENDPOINTS } from '../gateways/esewa';
-import { CompatHttp, rethrow } from './http';
+import { CompatHttp, isRecord, rethrow } from './http';
 import { PaymentError, PaymentErrorCode } from './enums';
 import type { EsewaConfig, EsewaPaymentOptions, EsewaPaymentResponse, EsewaVerificationOptions, PaymentVerificationResponse } from './types';
 
@@ -13,7 +13,7 @@ interface StatusCheckResponse {
 }
 
 /**
- * The 2.0.7 eSewa gateway, on the v3 core. Same inputs, outputs and errors as 2.0.7.
+ * The 2.0.8 eSewa gateway, on the v3 core. Same inputs, outputs and errors as 2.0.8.
  *
  * @example
  * const esewa = new EsewaGateway({ productCode: 'EPAYTEST', secretKey: '8gBm/:&EnhH.1/q', environment: 'sandbox' });
@@ -22,11 +22,12 @@ export class EsewaGateway {
   private readonly baseUrl: string;
   private readonly statusCheckUrl: string;
   private readonly productCode: string;
-  private readonly secretKey!: string;
-  private readonly http: CompatHttp;
+  /** Private fields, so console.log, util.inspect and JSON.stringify never show the key. */
+  readonly #secretKey: string;
+  readonly #http: CompatHttp;
 
   constructor(config: EsewaConfig) {
-    if (!config.productCode || !config.secretKey) {
+    if (!config || !config.productCode || !config.secretKey) {
       throw new PaymentError('eSewa product code and secret key are required', PaymentErrorCode.INVALID_CONFIG);
     }
     if (config.environment !== undefined && config.environment !== 'sandbox' && config.environment !== 'production') {
@@ -37,13 +38,13 @@ export class EsewaGateway {
     this.baseUrl = hosts.form.replace(/\/form$/, '');
     this.statusCheckUrl = hosts.status;
     this.productCode = config.productCode;
-    Object.defineProperty(this, 'secretKey', { value: config.secretKey, enumerable: false });
-    this.http = new CompatHttp('esewa', [config.secretKey]);
+    this.#secretKey = config.secretKey;
+    this.#http = new CompatHttp('esewa', [config.secretKey]);
   }
 
   private generateSignature(data: string): string {
     try {
-      return hmacSha256(data, this.secretKey);
+      return hmacSha256(data, this.#secretKey);
     } catch {
       throw new PaymentError('Failed to generate payment signature', PaymentErrorCode.SIGNATURE_GENERATION_FAILED);
     }
@@ -54,10 +55,17 @@ export class EsewaGateway {
    * New code should use `createEsewa().initiate()`, which returns the fields for the browser to post.
    */
   async createPayment(options: EsewaPaymentOptions): Promise<EsewaPaymentResponse> {
+    // Input is checked before the try, so bad input never looks like a network error.
+    if (!isRecord(options) || !options.transaction_uuid || !options.total_amount) {
+      throw new PaymentError('Transaction UUID and total amount are required', PaymentErrorCode.INVALID_PAYMENT_OPTIONS);
+    }
+    if (typeof options.signed_field_names !== 'string' || options.signed_field_names.trim() === '') {
+      throw new PaymentError(
+        'signed_field_names is required, for example "total_amount,transaction_uuid,product_code"',
+        PaymentErrorCode.INVALID_PAYMENT_OPTIONS
+      );
+    }
     try {
-      if (!options.transaction_uuid || !options.total_amount) {
-        throw new PaymentError('Transaction UUID and total amount are required', PaymentErrorCode.INVALID_PAYMENT_OPTIONS);
-      }
       const signatureData = options.signed_field_names
         .split(',')
         .map(field => `${field}=${String(options[field as keyof EsewaPaymentOptions])}`)
@@ -67,7 +75,7 @@ export class EsewaGateway {
       for (const [key, value] of Object.entries(options)) form[key] = String(value);
       form.signature = signature;
 
-      const res = await this.http.send(
+      const res = await this.#http.send(
         { method: 'POST', url: `${this.baseUrl}/form`, form },
         'Failed to create payment',
         PaymentErrorCode.PAYMENT_FAILED,
@@ -78,7 +86,7 @@ export class EsewaGateway {
       }
       return { form_html: res.data, transaction_uuid: options.transaction_uuid, signature };
     } catch (error) {
-      return rethrow(error, 'Failed to create payment');
+      return rethrow(error, 'Failed to create payment', PaymentErrorCode.PAYMENT_FAILED);
     }
   }
 
@@ -89,11 +97,11 @@ export class EsewaGateway {
    * const r = await payments.esewa.verifyPayment({ transaction_uuid: 'o-1', total_amount: 100, expectedAmount: 100 });
    */
   async verifyPayment(options: EsewaVerificationOptions): Promise<PaymentVerificationResponse> {
+    if (!isRecord(options) || !options.transaction_uuid || !options.total_amount) {
+      throw new PaymentError('Transaction UUID and total amount are required for verification', PaymentErrorCode.INVALID_VERIFICATION_OPTIONS);
+    }
     try {
-      if (!options.transaction_uuid || !options.total_amount) {
-        throw new PaymentError('Transaction UUID and total amount are required for verification', PaymentErrorCode.INVALID_VERIFICATION_OPTIONS);
-      }
-      const res = await this.http.send(
+      const res = await this.#http.send(
         {
           method: 'GET',
           url: this.statusCheckUrl,
@@ -111,6 +119,9 @@ export class EsewaGateway {
           status = 'COMPLETED';
           break;
         case 'PENDING':
+        case 'AMBIGUOUS':
+          // eSewa has not settled the payment yet. Pending, not failed, so the
+          // buyer is not asked to pay twice. raw_status still says AMBIGUOUS.
           status = 'PENDING';
           break;
         case 'FULL_REFUND':
@@ -119,20 +130,31 @@ export class EsewaGateway {
           status = 'CANCELED';
           break;
         default:
+          // NOT_FOUND and any status eSewa adds later.
           status = 'FAILED';
       }
 
-      if (options.expectedAmount !== undefined && toRupees(payment.total_amount) !== Number(options.expectedAmount)) {
-        throw new PaymentError(
-          `eSewa amount ${String(payment.total_amount)} does not match the expected amount ${String(options.expectedAmount)} (rupees)`,
-          PaymentErrorCode.AMOUNT_MISMATCH,
-          { status: res.status, data: payment }
-        );
+      // Only a completed payment has an amount worth checking.
+      if (options.expectedAmount !== undefined && status === 'COMPLETED') {
+        if (typeof payment.total_amount !== 'number' && typeof payment.total_amount !== 'string') {
+          throw new PaymentError(
+            'eSewa marked the payment complete but sent no amount, so it cannot be checked against the expected amount',
+            PaymentErrorCode.INVALID_RESPONSE,
+            { status: res.status, data: payment }
+          );
+        }
+        if (toRupees(payment.total_amount) !== Number(options.expectedAmount)) {
+          throw new PaymentError(
+            `eSewa amount ${String(payment.total_amount)} does not match the expected amount ${String(options.expectedAmount)} (rupees)`,
+            PaymentErrorCode.AMOUNT_MISMATCH,
+            { status: res.status, data: payment }
+          );
+        }
       }
 
       return { status, transaction_id: payment.ref_id || '', amount: payment.total_amount as number, payment_details: payment, raw_status: payment.status };
     } catch (error) {
-      return rethrow(error, 'Failed to verify payment');
+      return rethrow(error, 'Failed to verify payment', PaymentErrorCode.VERIFICATION_FAILED);
     }
   }
 }

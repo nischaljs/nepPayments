@@ -4,7 +4,7 @@ import { PaymentError, PaymentErrorCode } from './enums';
 import type { KhaltiConfig, EsewaConfig } from './types';
 
 /**
- * The 2.0.7 `NepPayments` class, unchanged for callers, built on the v3 core.
+ * The 2.0.8 `NepPayments` class, unchanged for callers, built on the v3 core.
  * Move to `createPayments` when you can: it checks the order id too and
  * keeps eSewa's AMBIGUOUS and Khalti's Refunded as their own statuses.
  *

@@ -95,7 +95,7 @@
   <!-- compat -> socket -->
   <path d="M605 226 L605 392" stroke="#57606a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
   <text x="614" y="372" class="m">Khalti and eSewa,</text>
-  <text x="614" y="386" class="m">2.0.7 API on the v3 core</text>
+  <text x="614" y="386" class="m">2.0.8 API on the v3 core</text>
 
   <!-- socket -->
   <rect x="40" y="396" width="720" height="140" rx="12" fill="#fff1e5" stroke="#b35c00" stroke-width="1.5"/>

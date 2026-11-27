@@ -5,6 +5,7 @@
 - A full README: quick start per gateway, safe defaults, mock mode and tests, migrating from `neppayments` 2.x, and notes for coding agents. With a demo GIF and an architecture picture (not in the package).
 - The package description and keywords say what the package does.
 - ConnectIPS and Hamro Pay are no longer marked experimental.
+- `nepal-payments/compat` now matches 2.0.8: eSewa AMBIGUOUS is `PENDING`, `expectedAmount` is checked only on `COMPLETED`, bad `createPayment` input throws its validation code before any request, an error that is not a request error gets the method's code instead of `NETWORK_ERROR`, the secret key and the HTTP client are private fields (not in `JSON.stringify(gateway)`), Khalti `transaction_id` is `''` when null, and a completed payment with no amount throws `INVALID_RESPONSE`.
 
 ## 3.0.0-rc.0 (2026-11-27)
 
@@ -30,7 +31,7 @@ New package name: `nepal-payments` (was `neppayments`). Release candidate.
 
 ### Upgrading
 
-- `import { NepPayments } from 'nepal-payments/compat'` keeps the 2.0.7 API and outputs, including 2.x status names.
+- `import { NepPayments } from 'nepal-payments/compat'` keeps the 2.0.8 API and outputs, including 2.x status names.
 
 ## 2.0.7 (2026-11-27)
 

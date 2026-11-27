@@ -52,8 +52,14 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** 2.x let its own PaymentErrors through and wrapped anything else. */
-export function rethrow(err: unknown, fallbackMessage: string): never {
+/**
+ * Let the layer's own PaymentErrors through. `send` already turned every
+ * request with no answer into NETWORK_ERROR or REQUEST_TIMEOUT, so anything
+ * else is a bug or bad input and gets the method's own code. Only the error's
+ * name is kept, so no outside text ends up in the message.
+ */
+export function rethrow(err: unknown, fallbackMessage: string, fallbackCode: PaymentErrorCode): never {
   if (err instanceof PaymentError) throw err;
-  throw new PaymentError(`${fallbackMessage}: no response from the gateway`, PaymentErrorCode.NETWORK_ERROR);
+  const name = err instanceof Error ? err.name : typeof err;
+  throw new PaymentError(`${fallbackMessage}: unexpected ${name}`, fallbackCode);
 }
