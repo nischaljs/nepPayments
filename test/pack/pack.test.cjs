@@ -12,22 +12,23 @@ const entries = ['', '/khalti', '/esewa', '/connectips', '/hamropay', '/nepalpay
 test('packed package installs and imports as ESM and CJS', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nepal-payments-pack-'));
   try {
-    const out = execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', dir], { cwd: root, encoding: 'utf8' });
-    const [info] = JSON.parse(out);
-    const files = info.files.map(f => f.path);
-    assert.ok(files.includes('dist/index.mjs') && files.includes('dist/index.js') && files.includes('dist/index.d.ts'));
-    assert.ok(files.includes('AGENTS.md') && files.includes('llms.txt') && files.includes('skills/nepal-payments/SKILL.md'));
-    assert.ok(!files.some(f => f.startsWith('src/') || f.startsWith('test/')), 'no source or tests in the tarball');
+    execFileSync('npm', ['pack', '--ignore-scripts', '--pack-destination', dir], { cwd: root, stdio: 'pipe' });
+    const archives = fs.readdirSync(dir).filter(name => name.endsWith('.tgz'));
+    assert.equal(archives.length, 1, 'npm pack wrote one archive');
 
     const app = path.join(dir, 'app');
     fs.mkdirSync(app);
     fs.writeFileSync(path.join(app, 'package.json'), '{"name":"app","private":true}');
-    execFileSync('npm', ['install', '--offline', '--no-audit', '--no-fund', path.join(dir, info.filename)], { cwd: app, stdio: 'ignore' });
+    execFileSync('npm', ['install', '--offline', '--no-audit', '--no-fund', path.join(dir, archives[0])], { cwd: app, stdio: 'ignore' });
     const pkg = JSON.parse(fs.readFileSync(path.join(app, 'node_modules/nepal-payments/package.json'), 'utf8'));
     assert.deepEqual(pkg.dependencies ?? {}, {});
 
     const installed = path.join(app, 'node_modules/nepal-payments');
     // Exercise the copied server setup the same way an installed-package user would.
+    for (const file of ['dist/index.mjs', 'dist/index.js', 'dist/index.d.ts', 'AGENTS.md', 'llms.txt', 'skills/nepal-payments/SKILL.md']) {
+      assert.ok(fs.existsSync(path.join(installed, file)), file);
+    }
+    for (const excluded of ['src', 'test']) assert.ok(!fs.existsSync(path.join(installed, excluded)));
     const template = fs.readFileSync(path.join(installed, '.env.example'), 'utf8');
     const init = path.join(installed, pkg.bin['nepal-payments-init']);
     execFileSync('node', [init], { cwd: app });
