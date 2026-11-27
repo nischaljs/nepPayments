@@ -15,6 +15,8 @@ export const payments = createPayments({
 });
 ```
 
+Mock mode works only under `next dev`. `next build`, `next start` and Vercel preview deployments set `NODE_ENV=production`, so `mode: 'mock'` is refused there (INVALID_CONFIG). Use `'sandbox'` on previews.
+
 `app/api/pay/khalti/route.ts` (start):
 
 ```ts
