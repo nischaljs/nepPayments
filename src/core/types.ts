@@ -63,7 +63,8 @@ export interface VerifyInput {
   /** Your order id, from your own database. */
   expectedOrderId: string;
   /**
-   * Optional: what `parseCallback` returned for this payment. When it is signed
+   * Optional: what `parseCallback` returned for this payment, the same object, not a copy
+   * (a copy counts as unsigned). When it is signed
    * (eSewa, the Hamro Pay webhook), its amount and order id are compared too.
    * This matters most for eSewa, where the status API only echoes the amount you sent.
    */

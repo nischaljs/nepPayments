@@ -77,6 +77,13 @@ export interface Client<I, CB, SI, RI> {
   refund(input: RI): Promise<RefundResult>;
 }
 
+// Every signed result parseCallback returned. verify trusts `signed` only on these exact
+// objects, so a copy with `signed: true` set by hand counts as unsigned. Kept on globalThis
+// so the ESM and CommonJS builds, loaded in one process, share one set.
+const SIGNED_SLOT = Symbol.for('nepal-payments.signedCallbacks');
+const signedStore = globalThis as unknown as Record<symbol, WeakSet<object> | undefined>;
+const SIGNED: WeakSet<object> = signedStore[SIGNED_SLOT] ?? (signedStore[SIGNED_SLOT] = new WeakSet());
+
 const STATUSES: readonly PaymentStatus[] = ['paid', 'pending', 'failed', 'canceled', 'refunded', 'expired', 'ambiguous'];
 const MOCK_STATUS: Record<MockOutcome, PaymentStatus> = { paid: 'paid', pending: 'pending', failed: 'failed' };
 
@@ -186,7 +193,7 @@ export function connect<C, E, S, I, CB, SI, RI>(
   // A signed callback carries the gateway's own amount and order id. Compare them too.
   const checkCallback = (input: VerifyInput): boolean => {
     const cb = input.callback;
-    if (!cb || !cb.signed) return false;
+    if (!cb || !cb.signed || !SIGNED.has(cb)) return false;
     if (cb.orderId !== null && cb.orderId !== input.expectedOrderId) {
       fail({ code: 'ORDER_MISMATCH', message: `The signed ${gateway} callback names order ${JSON.stringify(cb.orderId)}, but you expected ${JSON.stringify(input.expectedOrderId)}. Do not ship this order.` });
     }
@@ -286,7 +293,9 @@ export function connect<C, E, S, I, CB, SI, RI>(
         if (!plug.parseCallback) return notSupported('callback');
         const r = plug.parseCallback(ctx, input);
         if (!STATUSES.includes(r.status)) fail({ code: 'INVALID_RESPONSE', message: `${gateway} plug returned an unknown status.` });
-        return Object.freeze({ gateway, ...r, raw: redactor.value(r.raw) });
+        const result = Object.freeze({ gateway, ...r, raw: redactor.value(r.raw) });
+        if (result.signed) SIGNED.add(result);
+        return result;
       }),
 
     status: input =>

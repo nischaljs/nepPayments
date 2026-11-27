@@ -228,6 +228,14 @@ test('esewa: verify compares a signed callback amount, since the status API echo
   const unsigned = { ...cheap, signed: false };
   const u = await p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: unsigned });
   assert.equal(u.checked.callback, false);
+  // signed: true set by hand on a copy is not trusted: only parseCallback's own result counts.
+  const faked = await p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: { ...unsigned, signed: true } });
+  assert.equal(faked.checked.callback, false);
+  // The ESM build's parseCallback result is trusted by the CommonJS build's verify.
+  const esm = await import('../dist/index.mjs');
+  const pe = esm.createPayments({ mode: 'sandbox', fetch: fakeFetch(fake.handler), esewa: { productCode: 'EPAYTEST', secretKey: ESEWA_SECRET } });
+  const cbEsm = await pe.esewa.parseCallback({ data: esewaCallback({ orderId: 'o-1', amount: rupees(100), secretKey: ESEWA_SECRET }) });
+  assert.equal((await p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: cbEsm })).checked.callback, true);
 });
 
 // ---------- ConnectIPS ----------
