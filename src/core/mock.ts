@@ -11,7 +11,10 @@ const OUTCOMES: readonly MockOutcome[] = ['paid', 'pending', 'failed'];
 export const MOCK_HOST = 'https://mock.nepal-payments.invalid';
 
 // Made once per process. A ref typed by hand, or made by another process, fails the check.
-const KEY = randomBytes(32);
+// Kept on globalThis so the ESM and CommonJS builds, loaded in one process, share one key.
+const KEY_SLOT = Symbol.for('nepal-payments.mockKey');
+const store = globalThis as unknown as Record<symbol, Buffer | undefined>;
+const KEY: Buffer = store[KEY_SLOT] ?? (store[KEY_SLOT] = randomBytes(32));
 const sign = (body: string) => createHmac('sha256', KEY).update(body).digest('base64url');
 
 /**

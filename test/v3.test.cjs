@@ -401,6 +401,14 @@ test('mock mode: a typed or changed ref fails; refused when NODE_ENV is producti
   }
 });
 
+test('mock mode: a ref made by the ESM build verifies in the CommonJS build', async () => {
+  const esm = await import('../dist/index.mjs');
+  const input = { amount: esm.rupees(10), orderId: 'o-1', orderName: 'n', returnUrl: 'https://a.example', websiteUrl: 'https://a.example' };
+  const { ref } = await esm.createPayments({ mode: 'mock', khalti: {} }).khalti.initiate(input);
+  const v = await createPayments({ mode: 'mock', khalti: {} }).khalti.verify({ ref, expectedAmount: rupees(10), expectedOrderId: 'o-1' });
+  assert.equal(v.paid, true);
+});
+
 test('subpath entries share one PaymentError class', () => {
   const k = require('../dist/khalti');
   const e = require('../dist/esewa');
