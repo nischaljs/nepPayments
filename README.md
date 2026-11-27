@@ -86,18 +86,24 @@ console.log(esewaPayment.form_html); // Serve this HTML to the client
 ### 4. Verify the Payment (Same for Both)
 
 ```ts
-// Khalti
-const verification = await payments.khalti.verifyPayment({ pidx: 'YOUR_KHALTI_PIDX' });
-console.log(verification);
+// Khalti: pass the amount you charged (paisa). A different amount throws AMOUNT_MISMATCH.
+const verification = await payments.khalti.verifyPayment({
+  pidx: 'YOUR_KHALTI_PIDX',
+  expectedAmount: 1000,
+});
+console.log(verification.status, verification.raw_status);
 
-// eSewa
+// eSewa: expectedAmount is in rupees.
 const verification = await payments.esewa.verifyPayment({
   product_code: 'EPAYTEST',
   transaction_uuid: 'YOUR_TRANSACTION_UUID',
   total_amount: 10,
+  expectedAmount: 10,
 });
 console.log(verification);
 ```
+
+Always verify on your server and pass `expectedAmount`. Only `status === 'COMPLETED'` means paid.
 
 ### 5. Handling Payment Success [KHALTI]
 
@@ -124,7 +130,9 @@ There is no further step required to complete the payment; however, the merchant
 - Payment verification is identical for both gateways.
 
 ## Error Handling
-- All methods throw errors with clear messages if something goes wrong (e.g., invalid credentials, network issues, payment not found).
+- Every method throws a `PaymentError` with `message`, `code` and, when the gateway answered, `response: { status, data }`.
+- Errors never carry request headers or your secret key, so they are safe to log.
+- Khalti's `Expired` and `User canceled` lookups are returned as statuses, not thrown.
 
 ## Contributing
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
