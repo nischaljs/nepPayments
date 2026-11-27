@@ -13,7 +13,9 @@ export * from './gateways/hamropay';
 interface Configs {
   khalti: KhaltiConfig;
   esewa: EsewaConfig;
+  /** Experimental: not yet run against a connectIPS sandbox. See docs/connectips.md. */
   connectips: ConnectIpsConfig;
+  /** Experimental: not yet run against a Hamro Pay sandbox. See docs/hamropay.md. */
   hamropay: HamroPayConfig;
 }
 

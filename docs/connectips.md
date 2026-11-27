@@ -2,6 +2,8 @@
 
 NCHL connectIPS e-payment. Your page posts a form signed with your RSA key (from the `.pfx` NCHL gives you) to connectIPS. connectIPS sends the buyer back to the success or failure URL registered with NCHL. You confirm with `validatetxn`.
 
+> **Experimental.** This plug is built from NCHL's documents and has not been run against a connectIPS sandbox yet. The amount check is an echo (see below). Test it on the sandbox before you take real money.
+
 ## Config
 
 ```ts
@@ -36,6 +38,8 @@ Hosts: sandbox `https://uat.connectips.com`, live `https://login.connectips.com`
 const start = await payments.connectips.initiate({ amount: rupees(500), orderId: 'order-42' });
 // start.kind === 'form': post start.fields to start.action ({base}/connectipswebgw/loginpage)
 ```
+
+Use a new `orderId` for every payment attempt, including a retry of the same order (for example `order-42-a2`): `TXNID` must be unique at connectIPS, and `validatetxn` looks the payment up by it. Keep the attempt id with your order and verify that one.
 
 `TXNID` and `REFERENCEID` are the `orderId`. `REMARKS` and `PARTICULARS` default to it. `TXNDATE` is today in Nepal time (DD-MM-YYYY); pass `date` to set it. `TXNAMT` is in paisa. `TOKEN` is RSA-SHA256 in base64 over `MERCHANTID=…,APPID=…,APPNAME=…,TXNID=…,TXNDATE=…,TXNCRNCY=NPR,TXNAMT=…,REFERENCEID=…,REMARKS=…,PARTICULARS=…,TOKEN=TOKEN`.
 

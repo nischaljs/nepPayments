@@ -3,6 +3,8 @@
 Khalti, eSewa, ConnectIPS and Hamro Pay payments for Node.js and Next.js. One typed TypeScript API to start and verify payments from Nepal's gateways.
 
 > 3.0.0-rc.0. This README is a placeholder. See `docs/` for each gateway.
+>
+> ConnectIPS and Hamro Pay are **experimental**: built from the gateways' documents, not yet run against their sandboxes.
 
 ```sh
 npm install nepal-payments

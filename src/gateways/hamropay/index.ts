@@ -8,7 +8,8 @@ export type { HamroPayConfig, HamroPayEndpoints, HamroPayInitiateInput, HamroPay
 export type HamroPayClient = Client<HamroPayInitiateInput, HamroPayCallbackInput, { ref: string }, never>;
 
 /**
- * Create a Hamro Pay checkout client. `initiate` creates the session on the
+ * Create a Hamro Pay checkout client. **Experimental**: built from Hamro Pay's developer
+ * reference, not yet run against a Hamro Pay sandbox. `initiate` creates the session on the
  * server and returns the signed form for the browser.
  *
  * @example
