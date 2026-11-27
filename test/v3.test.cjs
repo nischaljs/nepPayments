@@ -341,6 +341,10 @@ test('hamropay: webhook accept and reject', async () => {
   await rejects(p.hamropay.parseCallback({ body: good.body.replace('"amount":10', '"amount":99'), signature: good.signature }), 'INVALID_SIGNATURE');
   const other = hamroPayWebhook({ orderId: 'o-1', merchantId: 'M-2', amount: rupees(10), webhookSecret: HAMRO.webhookSecret });
   await rejects(p.hamropay.parseCallback(other), 'INVALID_SIGNATURE');
+  const numeric = createPayments({ mode: 'sandbox', fetch: fakeFetch(), hamropay: { ...HAMRO, merchantId: '12345' } });
+  const asText = hamroPayWebhook({ orderId: 'o-1', merchantId: '12345', amount: rupees(10), webhookSecret: HAMRO.webhookSecret });
+  const asNumber = { body: asText.body.replace('"merchantId":"12345"', '"merchantId":12345'), signature: asText.signature };
+  assert.equal((await numeric.hamropay.parseCallback(asNumber)).status, 'paid');
   const noHook = createPayments({ mode: 'sandbox', hamropay: { ...HAMRO, webhookSecret: undefined } });
   await rejects(noHook.hamropay.parseCallback(good), 'INVALID_CONFIG');
   const redirect = await p.hamropay.parseCallback('https://shop.example/s?MerchantTxnId=o-1');

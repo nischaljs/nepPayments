@@ -238,7 +238,8 @@ export const hamroPayPlug: Plug<HamroPayConfig, HamroPayEndpoints, undefined, Ha
         safeEqual(hamroPaySignature([id, String(body.merchantId ?? ''), status, a], secret as string), String(input.signature ?? ''))
       );
       if (!ok) ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook signature does not match. Do not trust this webhook.' });
-      if (body.merchantId !== ctx.config.merchantId) ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook is for another merchant.' });
+      // Compared as text: the webhook may send the merchant id as a JSON number.
+      if (String(body.merchantId ?? '') !== String(ctx.config.merchantId)) ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook is for another merchant.' });
       const mapped = hamroPayStatus(status);
       // Same page, webhook body: `amount` is "double | Transaction amount in Rs.".
       return { ref: id, orderId: id, status: mapped, amount: mapped === 'paid' ? tryRupees(amountNumber) : null, transactionId: null, signed: true, rawStatus: status, raw: body };

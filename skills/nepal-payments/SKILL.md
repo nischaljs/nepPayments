@@ -21,7 +21,7 @@ One typed API for Nepal's payment gateways. Server only. Node 18 or later.
 - Amounts are integer paisa: `rupees(100)` is `10000`. Never pass a float.
 - `verify` throws `AMOUNT_MISMATCH` or `ORDER_MISMATCH` when the gateway disagrees with what you expected. Do not retry; flag the order.
 - Statuses: `paid` ships. `pending` and `ambiguous` mean check again later. `failed`, `canceled`, `expired`, `refunded` do not ship. They are return values, never errors.
-- Errors are `PaymentError` with `code`: INVALID_CONFIG, INVALID_INPUT, AMOUNT_MISMATCH, ORDER_MISMATCH, INVALID_SIGNATURE, AUTH_ERROR, GATEWAY_ERROR, INVALID_RESPONSE, NETWORK_ERROR, TIMEOUT, NOT_SUPPORTED. Messages never hold secrets.
+- Errors are `PaymentError` with `code`. Check them with `isPaymentError(e)`, not `instanceof PaymentError`. Codes: INVALID_CONFIG, INVALID_INPUT, AMOUNT_MISMATCH, ORDER_MISMATCH, INVALID_SIGNATURE, AUTH_ERROR, GATEWAY_ERROR, INVALID_RESPONSE, NETWORK_ERROR, TIMEOUT, NOT_SUPPORTED. Messages never hold secrets.
 - Khalti cannot report the order id (`result.checked.orderId` is false). Store `start.ref` (the pidx) with the order at initiate and verify only that stored pidx: `verify({ ref: order.ref, ... })`. Never verify the pidx from the callback URL; use it only to find the order.
 - Hamro Pay in live mode needs `endpoints: { api, gateway }` from Hamro Pay.
 - ConnectIPS and Hamro Pay are experimental: not yet run against their sandboxes. ConnectIPS needs a new `orderId` per attempt, and its amount check is an echo.
