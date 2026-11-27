@@ -46,6 +46,7 @@ export class PaymentsController {
       amount: order.amount, orderId: order.id, orderName: order.name,
       returnUrl: 'https://shop.example/pay/khalti/return', websiteUrl: 'https://shop.example'
     });
+    if (start.kind !== 'redirect') throw new Error('Expected Khalti redirect');
     await this.orders.saveRef(order.id, start.ref);
     return { url: start.url };
   }

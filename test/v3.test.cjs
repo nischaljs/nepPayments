@@ -284,6 +284,25 @@ test('connectips: validatetxn call, statuses and mismatches', async () => {
   assert.deepEqual({ ref: cb.ref, status: cb.status, signed: cb.signed }, { ref: 'o-1', status: 'pending', signed: false });
 });
 
+test('connectips: merchant field limits and read-only transaction details', async () => {
+  const config = { ...CIPS, pfx: fixture('test-aes.pfx') };
+  for (const patch of [{ merchantId: '9007199254740993' }, { appId: 'a'.repeat(16) }, { appName: 'a'.repeat(31) }]) {
+    assert.throws(() => createPayments({ mode: 'sandbox', connectips: { ...config, ...patch } }), e => e.code === 'INVALID_CONFIG');
+  }
+  const fake = fakeConnectIps();
+  const client = all(fakeFetch(fake.handler)).connectips;
+  const order = { amount: paisa(1234), orderId: 'a'.repeat(20) };
+  await client.initiate({ ...order, remarks: 'r'.repeat(50), particulars: 'p'.repeat(100) });
+  for (const patch of [{ orderId: 'a'.repeat(21) }, { remarks: 'r'.repeat(51) }, { particulars: 'p'.repeat(101) }, { date: new Date(NaN) }]) {
+    await rejects(client.initiate({ ...order, ...patch }), 'INVALID_INPUT');
+  }
+  const details = await client.status({ ref: order.orderId, amount: order.amount, details: true });
+  assert.equal(fake.calls[0].path, '/connectipswebws/api/creditor/gettxndetail');
+  assert.equal(details.raw.creditStatus, '000');
+  assert.ok(details.transactionId);
+  assert.equal('paid' in details, false);
+});
+
 test('connectips: many verifies do not grow the shared redactor; each call hides its own token', async () => {
   const fake = fakeConnectIps();
   const tokens = [];
@@ -330,6 +349,7 @@ test('hamropay: session, form token and transaction status', async () => {
     fake.set('o-1', { status: raw });
     assert.equal((await p.hamropay.verify({ ref: 'o-1', expectedAmount: rupees(10), expectedOrderId: 'o-1' })).status, want, raw);
   }
+  await rejects(p.hamropay.initiate({ amount: rupees(10), orderId: 'empty', products: [], successUrl: 'https://a.example', failureUrl: 'https://a.example' }), 'INVALID_INPUT');
   const wrongKey = createPayments({ mode: 'sandbox', fetch: fakeFetch(fake.handler), hamropay: { ...HAMRO, clientSecret: 'other-secret' } });
   await rejects(wrongKey.hamropay.verify({ ref: 'o-1', expectedAmount: rupees(10), expectedOrderId: 'o-1' }), 'AUTH_ERROR');
   await rejects(p.hamropay.initiate({ amount: rupees(10), orderId: 'a,b', successUrl: 'https://a.example', failureUrl: 'https://a.example' }), 'INVALID_INPUT');
@@ -355,13 +375,8 @@ test('hamropay: webhook accept and reject', async () => {
   const asText = hamroPayWebhook({ orderId: 'o-1', merchantId: '12345', amount: rupees(10), webhookSecret: HAMRO.webhookSecret });
   const asNumber = { body: asText.body.replace('"merchantId":"12345"', '"merchantId":12345'), signature: asText.signature };
   assert.equal((await numeric.hamropay.parseCallback(asNumber)).status, 'paid');
-  // A signed webhook that says paid but has an amount this library cannot read fails verify.
-  const fakeHp = fakeHamroPay();
-  const hp = createPayments({ mode: 'sandbox', fetch: fakeFetch(fakeHp.handler), hamropay: HAMRO });
-  const odd = await hp.hamropay.parseCallback(hamroPayWebhook({ orderId: 'o-1', merchantId: HAMRO.merchantId, amount: rupees(10), webhookSecret: HAMRO.webhookSecret, amountText: '10.005' }));
-  assert.deepEqual({ signed: odd.signed, status: odd.status, amount: odd.amount }, { signed: true, status: 'paid', amount: null });
-  const oddErr = await rejects(hp.hamropay.verify({ ref: 'o-1', expectedAmount: rupees(10), expectedOrderId: 'o-1', callback: odd }), 'INVALID_RESPONSE');
-  assert.match(oddErr.message, /signed hamropay callback says paid with no amount/);
+  const subPaisa = hamroPayWebhook({ orderId: 'o-1', merchantId: HAMRO.merchantId, amount: rupees(10), webhookSecret: HAMRO.webhookSecret, amountText: '10.005' });
+  await rejects(p.hamropay.parseCallback(subPaisa), 'INVALID_SIGNATURE');
   const noHook = createPayments({ mode: 'sandbox', hamropay: { ...HAMRO, webhookSecret: undefined } });
   await rejects(noHook.hamropay.parseCallback(good), 'INVALID_CONFIG');
   const redirect = await p.hamropay.parseCallback('https://shop.example/s?MerchantTxnId=o-1');

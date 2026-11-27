@@ -1,14 +1,14 @@
-import { connect, type Client, type CommonOptions, type Mode, type Paisa } from '../../core';
-import { connectIpsPlug, type ConnectIpsCallbackInput, type ConnectIpsConfig, type ConnectIpsInitiateInput } from './plug';
+import { connect, type Client, type CommonOptions, type Mode } from '../../core';
+import { connectIpsPlug, type ConnectIpsStatusInput, type ConnectIpsCallbackInput, type ConnectIpsConfig, type ConnectIpsInitiateInput } from './plug';
 
 export { connectIpsPlug, connectIpsStatus, connectIpsDate, connectIpsFormMessage, connectIpsValidateMessage, CONNECTIPS_ENDPOINTS } from './plug';
-export type { ConnectIpsConfig, ConnectIpsEndpoints, ConnectIpsInitiateInput, ConnectIpsCallbackInput } from './plug';
+export type { ConnectIpsStatusInput, ConnectIpsConfig, ConnectIpsEndpoints, ConnectIpsInitiateInput, ConnectIpsCallbackInput } from './plug';
 
 /** A connected ConnectIPS client. Refund is not in this library, so `refund` throws NOT_SUPPORTED. */
-export type ConnectIpsClient = Client<ConnectIpsInitiateInput, ConnectIpsCallbackInput, { ref: string; amount: Paisa }, never>;
+export type ConnectIpsClient = Client<ConnectIpsInitiateInput, ConnectIpsCallbackInput, ConnectIpsStatusInput, never>;
 
 /**
- * Create a ConnectIPS client. The amount check is an echo of the amount sent.
+ * Create a ConnectIPS client. See the merchant guide for the limits of the amount check.
  * Use a new orderId for every payment attempt. The private key is read once, here; a wrong
  * pfx password throws INVALID_CONFIG now, not on the first payment.
  *

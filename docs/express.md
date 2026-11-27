@@ -22,6 +22,7 @@ app.post('/pay/khalti/:orderId', async (req, res) => {
     amount: order.amount, orderId: order.id, orderName: `Order ${order.id}`,
     returnUrl: `${base}/pay/khalti/return`, websiteUrl: base
   });
+  if (start.kind !== 'redirect') throw new Error('Expected Khalti redirect');
   order.ref = start.ref;
   res.redirect(303, start.url);
 });
@@ -29,10 +30,10 @@ app.post('/pay/khalti/:orderId', async (req, res) => {
 app.get('/pay/khalti/return', async (req, res) => {
   const cb = await payments.khalti.parseCallback(req.originalUrl);
   const order = [...orders.values()].find(o => o.ref === cb.ref);
-  if (!order) return res.status(404).send('Unknown payment');
+  if (!order?.ref) return res.status(404).send('Unknown payment');
   try {
     const result = await payments.khalti.verify({ ref: order.ref, expectedAmount: order.amount, expectedOrderId: order.id });
-    order.paid = result.paid;
+    if (result.paid) order.paid = true;
     res.redirect(result.paid ? '/thanks' : `/pay/retry?status=${result.status}`);
   } catch (e) {
     if (isPaymentError(e)) return res.status(e.code === 'NETWORK_ERROR' || e.code === 'TIMEOUT' ? 503 : 400).send(e.message);
@@ -40,12 +41,13 @@ app.get('/pay/khalti/return', async (req, res) => {
   }
 });
 
-app.get('/pay/esewa/:orderId', async (req, res) => {
+app.post('/pay/esewa/:orderId', async (req, res) => {
   const order = orders.get(req.params.orderId)!;
   const start = await payments.esewa.initiate({
     amount: order.amount, orderId: order.id,
     successUrl: `${base}/pay/esewa/success`, failureUrl: `${base}/pay/esewa/failure`
   });
+  if (start.kind !== 'form') throw new Error('Expected eSewa form');
   const inputs = Object.entries(start.fields).map(([k, v]) => `<input type="hidden" name="${k}" value="${v.replace(/"/g, '&quot;')}">`).join('');
   res.send(`<form id="f" method="POST" action="${start.action}">${inputs}</form><script>f.submit()</script>`);
 });
@@ -54,7 +56,7 @@ app.get('/pay/esewa/success', async (req, res) => {
   const cb = await payments.esewa.parseCallback(req.originalUrl); // throws INVALID_SIGNATURE on a forged callback
   const order = orders.get(cb.ref)!;
   const result = await payments.esewa.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id, callback: cb }); // the signed callback's amount is checked too
-  order.paid = result.paid;
+  if (result.paid) order.paid = true;
   res.redirect(result.paid ? '/thanks' : `/pay/retry?status=${result.status}`);
 });
 

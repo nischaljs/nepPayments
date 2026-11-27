@@ -7,6 +7,9 @@ export default defineConfig({
     esewa: 'src/esewa.ts',
     connectips: 'src/connectips.ts',
     hamropay: 'src/hamropay.ts',
+    nepalpay: 'src/nepalpay.ts',
+    fonepay: 'src/fonepay.ts',
+    bankcard: 'src/bankcard.ts',
     compat: 'src/compat/index.ts',
     testing: 'src/testing/index.ts'
   },

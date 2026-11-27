@@ -2,7 +2,7 @@
 
 # nepal-payments
 
-Khalti, eSewa, ConnectIPS and Hamro Pay for Node.js and TypeScript. One API, zero runtime dependencies, built for coding agents too.
+Nepal payment gateways for Node.js and TypeScript. One API, zero runtime dependencies, built for coding agents too.
 
 [![npm version](https://img.shields.io/npm/v/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
 [![npm downloads](https://img.shields.io/npm/dm/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
@@ -10,36 +10,95 @@ Khalti, eSewa, ConnectIPS and Hamro Pay for Node.js and TypeScript. One API, zer
 [![types: included](https://img.shields.io/npm/types/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
 [![dependencies: 0](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/package.json)
 
-![A terminal in mock mode: npm install nepal-payments, a short script that starts a Khalti payment and verifies it, then the run. The first verify says paid = true. The second verify, with a different expected amount, stops with AMOUNT_MISMATCH.](https://raw.githubusercontent.com/nischaljs/nepal-payments/v3.0.0-rc.2/docs/media/demo.gif)
+## Verify your first payment locally
 
-> **3.0.0-rc.1, a release candidate.** Khalti, eSewa, ConnectIPS and Hamro Pay are all ready to use.
+Install the v3 release candidate in a Node.js 18+ server project.
 
-## Why
-
-Every Nepali shop that takes money online writes the same code: start a payment, send the buyer away, check the payment when they come back. The check is the part that goes wrong. A buyer can come back with a cheaper payment's id, or a callback that was never signed.
-
-- **One shape for every gateway.** `initiate`, `parseCallback`, `verify`. Learn it once.
-- **The checks are built in.** `verify` compares the amount and the order with your own records, and throws when they differ.
-- **Small and plain.** No runtime dependencies. It uses the `fetch` that comes with Node 18.
-- **Typed.** Only the gateways you configure exist on `payments`, and TypeScript knows which.
-- **Test without keys.** Mock mode, and fake gateways for your tests.
-
-## Install
-
-You need Node.js 18 or newer. This package runs on your server only. Never import it in browser code.
-
-```bash
-npm install nepal-payments
+```sh
+npm install nepal-payments@next
 ```
 
-ESM and CommonJS both work, with types.
+Save this as `checkout.mjs` and run **`node checkout.mjs`**. It runs entirely on your machine with no account, keys, or network requests.
+
+```js
+import { createPayments, rupees } from 'nepal-payments';
+
+const { connectips } = createPayments({ mode: 'mock', connectips: {} });
+const attempt = { id: 'tea-1-a1', amount: rupees(100) };
+const start = await connectips.initiate({ orderId: attempt.id, amount: attempt.amount });
+attempt.ref = start.ref;
+
+const result = await connectips.verify({
+  ref: attempt.ref, expectedAmount: attempt.amount, expectedOrderId: attempt.id
+});
+console.log(result.status, result.amount); // paid 10000 (paisa)
+```
+
+To try a pending payment, add `mockOutcome: 'pending'` to the initiate input. A mock reference lasts for the current process. Keep the SDK and your credentials on the server.
+
+**Connect your sandbox.** [Khalti](#khalti) · [eSewa](#esewa) · [ConnectIPS](#connectips) · [Hamro Pay](#hamro-pay). For ConnectIPS and Hamro Pay, the request formats have been reviewed against provider documentation and tested offline. Merchant sandbox acceptance is still pending.
+
+**Try a merchant workflow from this checkout.** On Node 22.13+, run `npm ci && npm run demo:checkout`. The example uses SQLite and a local Hamro Pay fake to handle a pending return, concurrent webhooks, and two successful attempts for one order. It grants one download and removes its temporary database on exit. In a package containing the example, run `node node_modules/nepal-payments/examples/checkout.mjs`.
+
+## Configure your merchant accounts
+
+Your server uses one SDK with a client for each enabled gateway. Your app owns checkout routes, order records and fulfilment. Each provider or acquiring bank issues its own merchant credentials and handles its payment page or QR network.
+
+From your site’s server project, initialize the [environment template](.env.example) and [server module](examples/payments.mjs) with one command after installing a version containing these adapters:
+
+```sh
+npx --no-install nepal-payments-init
+```
+
+The command creates `.env` and `payments.mjs` and preserves existing files. If your app already has an environment file, merge the entries for the gateways you use. See the [Express](docs/express.md), [Next.js](docs/nextjs.md) and [NestJS](docs/nestjs.md) checkout routes for framework-specific examples.
+
+Set `PAYMENT_GATEWAYS=khalti,fonepay` to enable those two clients, or use the seven names shown in the template to enable all. Leave `PAYMENT_MODE=mock` for local development. For a merchant sandbox, set it to `sandbox` and fill the matching credential blocks. Switch to `live` with production credentials after merchant acceptance. These variables are read by the copied module. Apps that call `createPayments()` directly can choose their own variable names.
+
+Load the environment using your server framework or deployment settings. On Node 20.6+ you can check the configuration from the project root:
+
+```sh
+node --env-file=.env --input-type=module -e "import { payments } from './payments.mjs'; console.log(Object.keys(payments))"
+```
+
+This prints the enabled client names and makes no payment requests. Import `payments` from that same module in your server routes. Store merchant-issued key files outside your repository and set the file paths in the server environment.
+
+| Client | Merchant setup and payment flow |
+|---|---|
+| [khalti](docs/khalti.md) | Khalti merchant account. Redirect the buyer and verify the saved payment reference. |
+| [esewa](docs/esewa.md) | eSewa ePay merchant. Post a signed form and verify with the signed return. |
+| [connectips](docs/connectips.md) | Bank/NCHL creditor enrollment. Register return URLs, sign the form with the creditor key, then validate the attempt. |
+| [hamropay](docs/hamropay.md) | Hamro Pay merchant portal. Create a session, post the form and check transaction status. Register a webhook for notifications. |
+| [nepalpay](docs/nepalpay.md) | NCHL/acquiring bank. Request both dynamic QR generation and transaction report access. |
+| [fonepay](docs/fonepay.md) | Fonepay/acquiring bank. Request Dynamic QR credentials. Run the payment listener on your server. |
+| [bankcard](docs/bankcard.md) | Bank-provisioned Cybersource Hosted Checkout profile. Enable NPR sales and register the merchant POST URL. |
+
+Set your application's actual return and webhook URLs in the places specified by each guide. The SDK takes checkout-specific URLs as inputs where the provider supports them. The environment template contains credentials and client settings.
+
+## Try QR and card checkout
+
+**In this checkout**, install dependencies once with `npm ci`, then run `npm run demo:payments` for a verified mock NEPALPAY invoice. After the build, try the other outcomes:
+
+```sh
+node examples/try-payment.mjs fonepay pending
+node examples/try-payment.mjs bankcard paid
+```
+
+**From an installed package containing these adapters**, run `npx --no-install nepal-payments-demo`. You can pass the same gateway and outcome arguments. The demo needs Node 18+, no credentials and no account. The current npm rc.2 predates these adapters.
+
+| Checkout | Buyer experience | Sandbox setup |
+|---|---|---|
+| NEPALPAY Dynamic QR | Scan an invoice QR in a banking app | [NCHL credentials, signing key and report access](docs/nepalpay.md) |
+| Fonepay Dynamic QR | Scan a QR linked to a unique merchant PRN | [Fonepay credentials and payment listener](docs/fonepay.md) |
+| Bank-hosted cards | Enter card details on the processor's hosted page | [NIC ASIA / Cybersource Secure Acceptance profile](docs/bankcard.md) |
+
+All three implement server-side verification and have offline protocol tests. Merchant UAT is pending.
 
 ## How it works
 
 The same three steps for every gateway:
 
-1. **Start.** `initiate()` on your server. Store `start.ref` with the order. Then send the buyer on: a redirect (Khalti) or a form that posts itself (eSewa, ConnectIPS, Hamro Pay).
-2. **Come back.** The buyer returns to your URL. `parseCallback()` reads it. Use it to find the order, nothing more.
+1. **Start.** `initiate()` on your server. Store `start.ref` with the order. Then send the buyer on: a redirect (Khalti) or a form that posts itself (eSewa, ConnectIPS, Hamro Pay, bank-hosted card), or an invoice QR (NEPALPAY, Fonepay).
+2. **Find the attempt.** Use the return URL, provider notification, or a scheduled QR lookup to locate the saved attempt. Follow the gateway guide for the evidence required by verification.
 3. **Verify.** `verify({ ref, expectedAmount, expectedOrderId })` on your server, with values from your own database. Ship only when `result.paid` is `true`.
 
 Amounts are whole paisa everywhere. `rupees(100)` is `10000` paisa. `paisa(10000)` is the same amount.
@@ -112,13 +171,16 @@ Pass `callback: cb`. The eSewa status API only repeats the amount you ask with, 
 
 ### ConnectIPS
 
+Enroll through your bank. NCHL supplies the merchant credentials and signing key and registers your two return URLs. [Merchant enrollment](https://doc.connectips.com/docs_npiqrgt/connectIPS-Gateway/cips-core-module)
+
 ```ts
 import fs from 'node:fs';
+import { createPayments, rupees } from 'nepal-payments';
 
 const payments = createPayments({
   mode: 'sandbox',
   connectips: {
-    merchantId: Number(process.env.CIPS_MERCHANT_ID),
+    merchantId: process.env.CIPS_MERCHANT_ID!,
     appId: process.env.CIPS_APP_ID!,
     appName: process.env.CIPS_APP_NAME!,
     password: process.env.CIPS_PASSWORD!,
@@ -132,14 +194,19 @@ const start = await payments.connectips.initiate({ amount: rupees(500), orderId:
 // post start.fields to start.action
 
 const cb = await payments.connectips.parseCallback(returnUrl);
-const result = await payments.connectips.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: 'order-42-a1' });
+const attempt = await findAttemptByRef(cb.ref); // your database
+const result = await payments.connectips.verify({ ref: attempt.ref, expectedAmount: attempt.amount, expectedOrderId: attempt.id });
 ```
 
-The form is signed with your RSA key from the `.pfx` NCHL gives you. Its amount check is an echo for now: compare with your connectIPS merchant report when it matters. Full guide: [docs/connectips.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/connectips.md).
+The form is signed with your RSA key from the `.pfx` NCHL gives you. NCHL documents a matching amount in its success response. Wrong-amount behavior still needs merchant sandbox confirmation. Full guide: [docs/connectips.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/connectips.md).
 
 ### Hamro Pay
 
+Create a test merchant and copy your credentials from the [Hamro Pay UAT portal](https://pay-sandbox.hamropatro.com/signup).
+
 ```ts
+import { createPayments, rupees } from 'nepal-payments';
+
 const payments = createPayments({
   mode: 'sandbox',
   hamropay: {
@@ -211,20 +278,24 @@ try {
 | --- | --- | --- | --- | --- |
 | Khalti | redirect | not signed (find the order, verify the stored pidx) | yes | ready |
 | eSewa | signed form | signed (HMAC-SHA256) | no | ready |
-| ConnectIPS | form signed with your RSA key | not signed | no | ready |
-| Hamro Pay | session, then signed form | webhook signed (HMAC-SHA512) | no | ready |
+| ConnectIPS | form signed with your RSA key | not signed | no | docs reviewed, offline tested |
+| Hamro Pay | session, then signed form | webhook signed (HMAC-SHA512) | no | docs reviewed, offline tested |
+| NEPALPAY | dynamic QR | server transaction report | no | offline tested |
+| Fonepay | dynamic QR | server WebSocket event and status lookup | no | offline tested |
+| Bank-hosted card | signed hosted form | signed sale notification | no | offline tested |
 
 
 ## Mock mode and tests
 
+![A terminal in mock mode: npm install nepal-payments, a short script that starts a Khalti payment and verifies it, then the run. The first verify says paid = true. The second verify, with a different expected amount, stops with AMOUNT_MISMATCH.](https://raw.githubusercontent.com/nischaljs/nepal-payments/v3.0.0-rc.2/docs/media/demo.gif)
+
 **Mock mode** needs no keys and makes no network call. Use it for local runs and demos.
 
 ```ts
-// Mock mode ignores the keys; any string type-checks.
 const payments = createPayments({
   mode: 'mock',
-  khalti: { secretKey: 'mock' },
-  esewa: { productCode: 'EPAYTEST', secretKey: 'mock' }
+  khalti: {},
+  esewa: {}
 });
 
 const start = await payments.khalti.initiate({ /* ... */ mockOutcome: 'failed' }); // 'paid' (default), 'pending' or 'failed'

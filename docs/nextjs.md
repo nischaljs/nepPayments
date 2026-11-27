@@ -34,6 +34,7 @@ export async function POST(request: Request) {
     amount: order.amount, orderId: order.id, orderName: order.name,
     returnUrl: `${origin}/api/pay/khalti/return`, websiteUrl: origin
   });
+  if (start.kind !== 'redirect') throw new Error('Expected Khalti redirect');
   await saveRef(order.id, start.ref);
   return NextResponse.json({ url: start.url });
 }

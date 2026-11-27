@@ -11,3 +11,8 @@ p.khalti.verify({ ref: 'r', expectedAmount: 100, expectedOrderId: 'o' });
 export const check = (r: VerifyResult): boolean => r.paid && r.status === 'paid';
 // @ts-expect-error status() has no paid field: ship only on verify().paid
 export const notForShipping = (s: StatusResult): boolean => s.paid;
+
+createPayments({ mode: 'mock', connectips: {}, hamropay: {} }).connectips;
+createPayments({ mode: 'sandbox', hamropay: { mode: 'mock' } }).hamropay;
+// @ts-expect-error A live override still needs merchant credentials.
+createPayments({ mode: 'mock', hamropay: { mode: 'live' } });

@@ -32,7 +32,10 @@
     "khalti-payment",
     "zero-dependency",
     "ai-agents",
-    "llms-txt"
+    "llms-txt",
+    "nepalpay-qr",
+    "fonepay",
+    "hosted-checkout"
   ],
   "author": "Nischal Bhattarai",
   "license": "MIT",
@@ -119,7 +122,37 @@
         "default": "./dist/testing.js"
       }
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./nepalpay": {
+      "import": {
+        "types": "./dist/nepalpay.d.mts",
+        "default": "./dist/nepalpay.mjs"
+      },
+      "require": {
+        "types": "./dist/nepalpay.d.ts",
+        "default": "./dist/nepalpay.js"
+      }
+    },
+    "./fonepay": {
+      "import": {
+        "types": "./dist/fonepay.d.mts",
+        "default": "./dist/fonepay.mjs"
+      },
+      "require": {
+        "types": "./dist/fonepay.d.ts",
+        "default": "./dist/fonepay.js"
+      }
+    },
+    "./bankcard": {
+      "import": {
+        "types": "./dist/bankcard.d.mts",
+        "default": "./dist/bankcard.mjs"
+      },
+      "require": {
+        "types": "./dist/bankcard.d.ts",
+        "default": "./dist/bankcard.js"
+      }
+    }
   },
   "typesVersions": {
     "*": {
@@ -140,6 +173,15 @@
       ],
       "testing": [
         "./dist/testing.d.ts"
+      ],
+      "nepalpay": [
+        "./dist/nepalpay.d.ts"
+      ],
+      "fonepay": [
+        "./dist/fonepay.d.ts"
+      ],
+      "bankcard": [
+        "./dist/bankcard.d.ts"
       ]
     }
   },
@@ -147,30 +189,41 @@
   "files": [
     "dist",
     "docs",
+    "examples/checkout.mjs",
+    "examples/payments.mjs",
+    ".env.example",
     "!docs/media",
     "skills",
     "AGENTS.md",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",
-    "llms.txt"
+    "llms.txt",
+    "examples/try-payment.mjs",
+    "bin/init.mjs"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
+    "demo:checkout": "npm run build && node examples/checkout.mjs",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "depcheck": "depcruise src --config .dependency-cruiser.cjs",
     "test": "npm run build && node --test test/*.test.cjs test/compat/*.test.cjs",
     "test:pack": "npm run build && node --test test/pack/*.test.cjs",
     "check": "npm run typecheck && npm run depcheck && npm test && npm run test:pack",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "demo:payments": "npm run build && node examples/try-payment.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.1",
     "dependency-cruiser": "^16.10.4",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3"
+  },
+  "bin": {
+    "nepal-payments-demo": "examples/try-payment.mjs",
+    "nepal-payments-init": "bin/init.mjs"
   }
 }

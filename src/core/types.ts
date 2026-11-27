@@ -1,7 +1,7 @@
 import type { Paisa } from './money';
 
 /** The gateways this library has plugs for. */
-export type GatewayName = 'khalti' | 'esewa' | 'connectips' | 'hamropay';
+export type GatewayName = 'khalti' | 'esewa' | 'connectips' | 'hamropay' | 'nepalpay' | 'fonepay' | 'bankcard';
 
 /**
  * Where calls go.
@@ -36,7 +36,7 @@ export interface FormStart {
   fields: Record<string, string>;
 }
 
-/** Reserved for QR gateways. No plug returns it yet. */
+/** Render the provider payload as a QR and check the saved attempt on your server. */
 export interface QrStart {
   kind: 'qr';
   payload: string;
@@ -86,8 +86,8 @@ export interface VerifyResult {
   /** The gateway's transaction id, when there is one. */
   transactionId: string | null;
   /**
-   * Which checks ran: `amount` when the gateway reports one (for eSewa and ConnectIPS that is an echo
-   * of the amount sent, see their docs); `orderId` when the gateway reports one; `callback` when a
+   * Which checks ran: `amount` when the gateway reports one (see the eSewa and ConnectIPS guides
+   * for limits on this comparison); `orderId` when the gateway reports one; `callback` when a
    * signed callback was passed and its amount was compared.
    */
   checked: { amount: boolean; orderId: boolean; callback: boolean };

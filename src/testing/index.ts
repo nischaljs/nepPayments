@@ -157,13 +157,14 @@ export function esewaCallback(i: { orderId: string; amount: Paisa; secretKey: st
  */
 export function fakeConnectIps(opts: { status?: string } = {}): FakeGateway {
   return makeGateway((req, path, body, g) => {
-    if (req.method !== 'POST' || !path.endsWith('/connectipswebws/api/creditor/validatetxn')) return undefined;
+    const details = path.endsWith('/connectipswebws/api/creditor/gettxndetail');
+    if (req.method !== 'POST' || (!details && !path.endsWith('/connectipswebws/api/creditor/validatetxn'))) return undefined;
     if (!req.headers.get('authorization')?.startsWith('Basic ')) return json(401, { message: 'Unauthorized' });
     const b = body as Record<string, unknown>;
     const ref = String(b.referenceId);
     if (!g.payments.has(ref)) g.set(ref, { amount: Number(b.txnAmt), status: opts.status ?? 'SUCCESS' });
     const p = g.payments.get(ref)!;
-    return json(200, { merchantId: b.merchantId, appId: b.appId, referenceId: p.ref, txnAmt: p.amount, token: null, status: p.status, statusDesc: p.status === 'SUCCESS' ? 'TRANSACTION SUCCESSFUL' : p.status });
+    return json(200, { merchantId: b.merchantId, appId: b.appId, referenceId: p.ref, ...(details && { txnId: p.transactionId, creditStatus: p.status === 'SUCCESS' ? '000' : null }), txnAmt: p.amount, token: null, status: p.status, statusDesc: p.status === 'SUCCESS' ? 'TRANSACTION SUCCESSFUL' : p.status });
   });
 }
 

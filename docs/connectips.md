@@ -2,17 +2,18 @@
 
 NCHL connectIPS e-payment. Your page posts a form signed with your RSA key (from the `.pfx` NCHL gives you) to connectIPS. connectIPS sends the buyer back to the success or failure URL registered with NCHL. You confirm with `validatetxn`.
 
-> **Note.** The amount check is an echo (see below).
+Enroll through your bank and register your success and failure URLs with NCHL. Obtain your merchant ID, application credentials, signing key and test host before switching from mock to sandbox. [NCHL enrollment](https://doc.connectips.com/docs_npiqrgt/connectIPS-Gateway/cips-core-module)
 
 ## Config
 
 ```ts
 import fs from 'node:fs';
+import { createPayments, rupees } from 'nepal-payments';
 
 const payments = createPayments({
   mode: 'sandbox',
   connectips: {
-    merchantId: Number(process.env.CIPS_MERCHANT_ID),
+    merchantId: process.env.CIPS_MERCHANT_ID!,
     appId: process.env.CIPS_APP_ID!,
     appName: process.env.CIPS_APP_NAME!,
     password: process.env.CIPS_PASSWORD!,   // the API password for appId, for validatetxn
@@ -35,7 +36,7 @@ Hosts: sandbox `https://uat.connectips.com`, live `https://login.connectips.com`
 ## Start a payment
 
 ```ts
-const start = await payments.connectips.initiate({ amount: rupees(500), orderId: 'order-42' });
+const start = await payments.connectips.initiate({ amount: rupees(500), orderId: 'order-42-a1' });
 // start.kind === 'form': post start.fields to start.action ({base}/connectipswebgw/loginpage)
 ```
 
@@ -47,12 +48,24 @@ Use a new `orderId` for every payment attempt, including a retry of the same ord
 
 ```ts
 const cb = await payments.connectips.parseCallback(req.url); // reads TXNID; signed: false
-const result = await payments.connectips.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+const attempt = await findAttemptByRef(cb.ref); // load the saved attempt or return 404
+const result = await payments.connectips.verify({ ref: attempt.ref, expectedAmount: attempt.amount, expectedOrderId: attempt.id });
 ```
 
 `verify` posts `{ merchantId, appId, referenceId, txnAmt, token }` to `{base}/connectipswebws/api/creditor/validatetxn`, where `token` signs `MERCHANTID=…,APPID=…,REFERENCEID=…,TXNAMT=…`.
 
-**The amount check is an echo.** validatetxn is asked with `txnAmt` (your expected amount) and answers with the `txnAmt` it was asked about. So `result.checked.amount` only says the echo matched, not that connectIPS charged that amount. It is not known yet whether connectIPS answers SUCCESS when `txnAmt` differs from the amount paid. Until there are sandbox tests that settle this, treat the amount check for connectIPS as an echo, and compare the amount in your connectIPS merchant report when it matters.
+NCHL's example returns the requested amount. `checked.amount` means the response amount matched your record. The provider's behavior for a different requested amount still needs merchant sandbox confirmation. During acceptance, compare a completed payment with the merchant report and record the response to a lookup with a different expected amount. [Payment validation](https://doc.connectips.com/docs_npiqrgt/connectIPS-Gateway/payment-validation)
+
+Use up to 20 characters for the attempt ID, 50 for remarks, and 100 for particulars. The app ID and app name allow 15 and 30 characters respectively. Supply the merchant ID as a decimal integer within JavaScript's safe integer range. [NCHL field limits](https://doc.connectips.com/docs_npiqrgt/connectIPS-Gateway/merchant-interface)
+
+## Look up a payment for support
+
+```ts
+const detail = await payments.connectips.status({ ref: attempt.ref, amount: attempt.amount, details: true });
+console.log(detail.transactionId); // NCHL transaction ID when available
+```
+
+This read-only lookup calls `gettxndetail`. The provider response in `detail.raw` can include the batch ID, credit status and charges. Use `verify` for fulfilment. [NCHL transaction details](https://doc.connectips.com/docs_npiqrgt/connectIPS-Gateway/txn_details)
 
 ## Statuses
 

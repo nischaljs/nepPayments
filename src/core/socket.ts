@@ -54,12 +54,14 @@ export interface Plug<C, E, S, I, CB = never, SI = never, RI = never> {
   secrets(config: C): Array<string | undefined>;
   /** False when the gateway's verify answer has no order id (Khalti). */
   reportsOrderId: boolean;
-  startKind: 'redirect' | 'form';
+  startKind: 'redirect' | 'form' | 'qr';
+  /** Verification uses evidence authenticated by this specific client. */
+  usesCallbackEvidence?: boolean;
   /** Amount and order id of an initiate input. Used by mock mode and the input check. */
   describe(input: I): { amount: Paisa; orderId: string };
   prepare?(config: C, mode: Exclude<Mode, 'mock'>): S;
   initiate(ctx: PlugContext<C, E, S>, input: I): Promise<Omit<InitiateResult, 'gateway'>>;
-  parseCallback?(ctx: PlugContext<C, E, S>, input: CB): Omit<CallbackResult, 'gateway'>;
+  parseCallback?(ctx: PlugContext<C, E, S>, input: CB): Omit<CallbackResult, 'gateway'> | Promise<Omit<CallbackResult, 'gateway'>>;
   verify(ctx: PlugContext<C, E, S>, input: VerifyInput): Promise<PlugVerify>;
   status?(ctx: PlugContext<C, E, S>, input: SI): Promise<PlugVerify>;
   refund?(ctx: PlugContext<C, E, S>, input: RI): Promise<unknown>;
@@ -172,6 +174,7 @@ export function connect<C, E, S, I, CB, SI, RI>(
     return { redactor: r, ctx: { ...base, redactor: r, http: createHttp({ gateway, timeoutMs: options.timeoutMs ?? 15000, fetch: options.fetch, redactor: r }) } };
   };
 
+  const parsedCallbacks = new WeakSet<object>();
   const check = (input: VerifyInput) => {
     if (!input || typeof input.ref !== 'string' || !input.ref) fail({ code: 'INVALID_INPUT', field: 'ref', message: 'verify needs ref: the ref initiate returned, stored with your order.' });
     if (typeof input.expectedOrderId !== 'string' || !input.expectedOrderId) {
@@ -183,6 +186,9 @@ export function connect<C, E, S, I, CB, SI, RI>(
     if (cb !== undefined) {
       if (!cb || typeof cb !== 'object' || cb.gateway !== gateway) {
         fail({ code: 'INVALID_INPUT', field: 'callback', message: `verify callback must be what ${gateway}.parseCallback returned.` });
+      }
+      if (base && plug.usesCallbackEvidence && !parsedCallbacks.has(cb)) {
+        fail({ code: 'INVALID_INPUT', field: 'callback', message: 'Verify with the callback parsed by this merchant client.' });
       }
       if (cb.ref !== input.ref) {
         fail({ code: 'INVALID_INPUT', field: 'callback', message: 'The callback is for a different ref than the one you verify. Verify the ref you stored with the order.' });
@@ -239,9 +245,11 @@ export function connect<C, E, S, I, CB, SI, RI>(
         paisa(amount);
         if (!orderId) fail({ code: 'INVALID_INPUT', field: 'orderId', message: 'initiate needs orderId: your own unique order id.' });
         if (!ctx) {
-          const ref = mockRef(input.mockOutcome, amount, orderId);
+          const ref = mockRef(gateway, input.mockOutcome, amount, orderId);
           const start =
-            plug.startKind === 'redirect'
+            plug.startKind === 'qr'
+              ? { kind: 'qr' as const, payload: `mock-qr:${gateway}:${ref}`, poll: { ref, intervalMs: 3000 } }
+              : plug.startKind === 'redirect'
               ? { kind: 'redirect' as const, url: `${MOCK_HOST}/${gateway}/pay?ref=${encodeURIComponent(ref)}` }
               : { kind: 'form' as const, action: `${MOCK_HOST}/${gateway}/pay`, method: 'POST' as const, fields: { ref } };
           return Object.freeze({ gateway, ...start, ref, raw: { mock: true } });
@@ -292,7 +300,7 @@ export function connect<C, E, S, I, CB, SI, RI>(
       }),
 
     parseCallback: input =>
-      guard(({ ctx, redactor }) => {
+      guard(async ({ ctx, redactor }) => {
         if (!ctx) {
           const values = Object.values((input ?? {}) as Record<string, unknown>).filter((v): v is string => typeof v === 'string');
           const ref = values.find(v => v.startsWith('mock.'));
@@ -301,9 +309,10 @@ export function connect<C, E, S, I, CB, SI, RI>(
           return Object.freeze({ gateway, ...v, signed: false });
         }
         if (!plug.parseCallback) return notSupported('callback');
-        const r = plug.parseCallback(ctx, input);
+        const r = await plug.parseCallback(ctx, input);
         if (!STATUSES.includes(r.status)) fail({ code: 'INVALID_RESPONSE', message: `${gateway} plug returned an unknown status.` });
         const result = Object.freeze({ gateway, ...r, raw: redactor.value(r.raw) });
+        if (plug.usesCallbackEvidence) parsedCallbacks.add(result);
         if (result.signed) SIGNED.add(result);
         return result;
       }),

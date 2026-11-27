@@ -2,9 +2,13 @@
 
 Hamro Pay checkout. Your server creates a session, your page posts a signed form to the Hamro Pay gateway, Hamro Pay sends the buyer back and can also post a signed webhook. You confirm with the transaction status API.
 
+Create a test merchant in the [UAT portal](https://pay-sandbox.hamropatro.com/signup). Copy the four client credentials. To receive webhooks, save your HTTPS endpoint under Configuration → Webhook and copy the separate signing secret. For live onboarding, confirm your hosts with Hamro Pay. [Provider quickstart](https://hamropay.com.np/checkout/developer/quickstart/)
+
 ## Config
 
 ```ts
+import { createPayments, rupees } from 'nepal-payments';
+
 const payments = createPayments({
   mode: 'sandbox',
   hamropay: {
@@ -37,7 +41,7 @@ Optional: `remarks` (250 characters or fewer, default the orderId), `phone`, `pr
 
 ## Amount units
 
-You always pass paisa. Hamro Pay uses a different unit per field, and the plug converts each one. From the [Hamro Pay API reference](https://hamropay.com.np/checkout/developer-reference/):
+You always pass paisa. Hamro Pay uses a different unit per field, and the plug converts each one. From the [Hamro Pay API reference](https://hamropay.com.np/checkout/developer/reference/):
 
 | Field | Hamro Pay unit | Doc text |
 |---|---|---|
@@ -58,7 +62,8 @@ const cb = await payments.hamropay.parseCallback(req.url);
 const hook = await payments.hamropay.parseCallback({ body: rawBody, signature: req.headers['signature'] });
 // signed: true; a bad signature or another merchant throws INVALID_SIGNATURE
 
-const result = await payments.hamropay.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+const attempt = await findAttemptByRef(hook.ref); // your database
+const result = await payments.hamropay.verify({ ref: attempt.ref, expectedAmount: attempt.amount, expectedOrderId: attempt.id, callback: hook });
 ```
 
 Pass the webhook body as the raw text you received, not a re-serialized object, so the amount is signed exactly as sent.
@@ -73,6 +78,10 @@ Pass the webhook body as the raw text you received, not a re-serialized object, 
 | anything else | `ambiguous` |
 
 The amount is read only when the status is COMPLETED. There is no refund API in this package for Hamro Pay.
+
+## Merchant sandbox acceptance
+
+Use the checkout quickstart’s test customer to complete a success, failure and pending payment. Record the returned transaction ID, the server-verified status and amount, and whether a repeated notification grants the order only once. Record the test date and SDK version. Use the portal to request live onboarding once the results match your order records. [Checkout quickstart](https://hamropay.com.np/checkout/developer/quickstart/)
 
 ## Testing
 

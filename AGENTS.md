@@ -9,7 +9,7 @@ Read these before you write payment code with this package.
 5. **Khalti: verify the pidx you stored.** The Khalti lookup has no order id, so `verify` cannot check `expectedOrderId` for Khalti. Store `start.ref` (the pidx) with the order at initiate and pass that stored value to `verify`. Never pass the pidx from the callback URL; use it only to find the order.
 6. **Test without keys.** Use `mode: 'mock'` for local runs and demos (refused when `NODE_ENV` is `production`; a mock ref works only in the process that made it), and `nepal-payments/testing` (`fakeFetch`, `fakeKhalti`, `fakeEsewa`, `fakeConnectIps`, `fakeHamroPay`) in tests. Tests must never call a sandbox or live host.
 
-Docs per gateway: `docs/khalti.md`, `docs/esewa.md`, `docs/connectips.md`, `docs/hamropay.md`. Recipes: `docs/express.md`, `docs/nextjs.md`, `docs/nestjs.md`.
+Docs per gateway: `docs/khalti.md`, `docs/esewa.md`, `docs/connectips.md`, `docs/hamropay.md`, `docs/nepalpay.md`, `docs/fonepay.md`, `docs/bankcard.md`. Recipes: `docs/express.md`, `docs/nextjs.md`, `docs/nestjs.md`.
 
 ## Releasing
 

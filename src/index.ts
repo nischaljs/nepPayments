@@ -1,3 +1,6 @@
+import { createBankCard, type BankCardConfig } from './gateways/bankcard';
+import { createFonepay, type FonepayConfig } from './gateways/fonepay';
+import { createNepalPay, type NepalPayConfig } from './gateways/nepalpay';
 import { PaymentError, type CommonOptions, type GatewayName, type Mode } from './core';
 import { createConnectIps, type ConnectIpsClient, type ConnectIpsConfig } from './gateways/connectips';
 import { createEsewa, type EsewaClient, type EsewaConfig } from './gateways/esewa';
@@ -9,8 +12,14 @@ export * from './gateways/khalti';
 export * from './gateways/esewa';
 export * from './gateways/connectips';
 export * from './gateways/hamropay';
+export * from './gateways/nepalpay';
+export * from './gateways/fonepay';
+export * from './gateways/bankcard';
 
 interface Configs {
+  bankcard: BankCardConfig;
+  fonepay: FonepayConfig;
+  nepalpay: NepalPayConfig;
   khalti: KhaltiConfig;
   esewa: EsewaConfig;
   /** See docs/connectips.md. */
@@ -20,6 +29,9 @@ interface Configs {
 }
 
 interface Clients {
+  bankcard: ReturnType<typeof createBankCard>;
+  fonepay: ReturnType<typeof createFonepay>;
+  nepalpay: ReturnType<typeof createNepalPay>;
   khalti: KhaltiClient;
   esewa: EsewaClient;
   connectips: ConnectIpsClient;
@@ -27,19 +39,24 @@ interface Clients {
 }
 
 /** Options for `createPayments`. Set `mode` once at the top, or per gateway. */
-export type PaymentsOptions = {
-  /** Default mode for every gateway below. */
-  mode?: Mode;
+type SharedOptions = {
   timeoutMs?: number;
   fetch?: typeof fetch;
-} & { [K in GatewayName]?: Configs[K] & { mode?: Mode; timeoutMs?: number } };
+};
+type GatewayOptions<K extends GatewayName> = Configs[K] & { mode?: Mode; timeoutMs?: number };
+type MockGatewayOptions<K extends GatewayName> = Partial<Configs[K]> & { timeoutMs?: number };
+
+export type PaymentsOptions = SharedOptions & (
+  | ({ mode: 'mock' } & { [K in GatewayName]?: GatewayOptions<K> | (MockGatewayOptions<K> & { mode?: 'mock' }) })
+  | ({ mode?: Mode } & { [K in GatewayName]?: GatewayOptions<K> | (MockGatewayOptions<K> & { mode: 'mock' }) })
+);
 
 /** The result of `createPayments`: only the gateways you configured. */
 export type Payments<O extends PaymentsOptions> = {
   readonly [K in GatewayName as O[K] extends object ? K : never]: Clients[K];
 };
 
-const MAKERS = { khalti: createKhalti, esewa: createEsewa, connectips: createConnectIps, hamropay: createHamroPay } as const;
+const MAKERS = { bankcard: createBankCard, fonepay: createFonepay, nepalpay: createNepalPay, khalti: createKhalti, esewa: createEsewa, connectips: createConnectIps, hamropay: createHamroPay } as const;
 
 /**
  * Create clients for the gateways you use. Only the gateways in `options` exist
@@ -66,7 +83,7 @@ export function createPayments<const O extends PaymentsOptions>(options: O): Pay
     out[name] = (MAKERS[name] as (c: typeof merged) => unknown)(merged);
   }
   if (Object.keys(out).length === 0) {
-    throw new PaymentError({ code: 'INVALID_CONFIG', message: 'createPayments needs at least one gateway: khalti, esewa, connectips or hamropay.' });
+    throw new PaymentError({ code: 'INVALID_CONFIG', message: 'createPayments needs at least one gateway: khalti, esewa, connectips, hamropay, nepalpay, fonepay or bankcard.' });
   }
   return Object.freeze(out) as Payments<O>;
 }

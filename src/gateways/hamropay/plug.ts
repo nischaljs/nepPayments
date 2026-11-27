@@ -1,4 +1,4 @@
-import { hmacSha512, safeEqual, tryRupees, paisa, type Paisa, type PaymentStatus, type Plug, type PlugContext, type PlugVerify } from '../../core';
+import { hmacSha512, safeEqual, tryRupees, toRupeeString, paisa, type Paisa, type PaymentStatus, type Plug, type PlugContext, type PlugVerify } from '../../core';
 
 /** Hamro Pay checkout config. All values are in the Hamro Pay merchant portal under Client Credentials. */
 export interface HamroPayConfig {
@@ -117,7 +117,7 @@ async function transaction(ctx: Ctx, ref: string): Promise<PlugVerify> {
   const status = hamroPayStatus(rawStatus);
   const echo = typeof d!.merchantTxnId === 'string' ? d!.merchantTxnId : typeof d!.merchantTransactionId === 'string' ? d!.merchantTransactionId : null;
   let amount: Paisa | null = null;
-  // Units differ by field. The Hamro Pay API reference (hamropay.com.np/checkout/developer-reference) says:
+  // Units differ by field. The Hamro Pay API reference (hamropay.com.np/checkout/developer/reference) says:
   // transaction status `amount` is "Double | Amount in Rupees." It is 0 until the payment finishes.
   if (status === 'paid') {
     amount = tryRupees(d!.amount);
@@ -134,13 +134,18 @@ async function transaction(ctx: Ctx, ref: string): Promise<PlugVerify> {
   };
 }
 
-/** The texts Hamro Pay may have signed for a JSON number: its literal in the body, then 10, 10.0 and 10.00. */
-function amountTexts(raw: string | null, n: number): string[] {
-  const out: string[] = [];
-  const lit = raw ? /"amount"\s*:\s*(-?\d+(?:\.\d+)?)/.exec(raw)?.[1] : undefined;
-  if (lit) out.push(lit);
-  out.push(String(n), n.toFixed(1), n.toFixed(2));
-  return [...new Set(out)];
+// JSON.parse converts numbers to doubles. Read the original top-level amount as
+// decimal text as well, keeping quoted strings and nested metadata intact.
+function webhookAmountText(raw: string): unknown {
+  const tokens = /"(?:\\.|[^"\\])*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+  const lossless = raw.replace(tokens, token => token.startsWith('"') ? token : JSON.stringify(token));
+  return JSON.parse(lossless)?.amount;
+}
+
+function amountTexts(amount: Paisa, literal: string): string[] {
+  const canonical = toRupeeString(amount);
+  const [whole, fraction = ''] = canonical.split('.');
+  return [...new Set([literal, canonical, `${whole}.${fraction.padEnd(1, '0')}`, `${whole}.${fraction.padEnd(2, '0')}`])];
 }
 
 function isWebhook(input: HamroPayCallbackInput): input is { body: string | Record<string, unknown>; signature: string } {
@@ -179,6 +184,9 @@ export const hamroPayPlug: Plug<HamroPayConfig, HamroPayEndpoints, undefined, Ha
     // Its sample sends it as the string "1000". The same text is signed in the header and the form token.
     const amount = String(i.amount);
     // Same page: productList `price` is "Amount in Rs. for render purpose so Rs.99.99 should be 99.99".
+    if (i.products !== undefined && (!Array.isArray(i.products) || !i.products.length)) {
+      ctx.fail({ code: 'INVALID_INPUT', field: 'products', message: 'Include at least one product or omit products.' });
+    }
     const products = (i.products ?? [{ name: remarks, price: i.amount, quantity: 1 }]).map(p => ({
       name: p.name,
       description: p.description ?? p.name,
@@ -232,9 +240,11 @@ export const hamroPayPlug: Plug<HamroPayConfig, HamroPayEndpoints, undefined, Ha
       }
       const id = String(body?.merchantTxnId ?? '');
       const status = String(body?.status ?? '');
-      const amountNumber = Number(body?.amount);
-      if (!id || !status || !Number.isFinite(amountNumber)) ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook is missing signed fields.' });
-      const ok = amountTexts(rawText, amountNumber).some(a =>
+      const value = rawText === null ? body?.amount : webhookAmountText(rawText);
+      const literal = typeof value === 'number' || typeof value === 'string' ? String(value) : '';
+      const amount = /^\d+(?:\.\d+)?$/.test(literal) ? tryRupees(literal) : null;
+      if (!id || !status || amount === null) return ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook needs signed fields and an amount in whole paisa.' });
+      const ok = amountTexts(amount, literal).some(a =>
         safeEqual(hamroPaySignature([id, String(body.merchantId ?? ''), status, a], secret as string), String(input.signature ?? ''))
       );
       if (!ok) ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook signature does not match. Do not trust this webhook.' });
@@ -242,7 +252,7 @@ export const hamroPayPlug: Plug<HamroPayConfig, HamroPayEndpoints, undefined, Ha
       if (String(body.merchantId ?? '') !== String(ctx.config.merchantId)) ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook is for another merchant.' });
       const mapped = hamroPayStatus(status);
       // Same page, webhook body: `amount` is "double | Transaction amount in Rs.".
-      return { ref: id, orderId: id, status: mapped, amount: mapped === 'paid' ? tryRupees(amountNumber) : null, transactionId: null, signed: true, rawStatus: status, raw: body };
+      return { ref: id, orderId: id, status: mapped, amount: mapped === 'paid' ? amount : null, transactionId: null, signed: true, rawStatus: status, raw: body };
     }
     let q: Record<string, string>;
     if (input instanceof URLSearchParams) q = Object.fromEntries(input.entries());

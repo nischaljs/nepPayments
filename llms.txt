@@ -27,3 +27,5 @@ Start with `createPayments({ mode: 'sandbox' | 'live' | 'mock', khalti?, esewa?,
 
 - [Agent skill](skills/nepal-payments/SKILL.md)
 - [Changelog](CHANGELOG.md)
+
+Unreleased adapters: NEPALPAY Dynamic QR (server report), Fonepay Dynamic QR (server event plus merchant status lookup), and bankcard (Cybersource Secure Acceptance signed NPR sale). See docs/nepalpay.md, docs/fonepay.md and docs/bankcard.md in the package. Try the credential-free nepal-payments-demo command.
