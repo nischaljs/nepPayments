@@ -38,15 +38,17 @@ Optional: `amountBreakdown`, `productDetails`, and `merchantExtra` (keys must st
 
 ## Verify
 
-Khalti sends the buyer back to `returnUrl` with `pidx`, `status`, `total_amount` and more in the query. Those values are not signed. Read the ref with `parseCallback`, then always verify:
+> **Important: Khalti cannot check the order id.** The lookup API does not return `purchase_order_id`, so `result.checked.orderId` is `false` and `expectedOrderId` is not compared. The only thing that ties a payment to your order is the pidx you stored. Store `start.ref` with the order at initiate, and verify **only that stored pidx**. Never verify a pidx taken from the callback URL: a buyer can put there the pidx of another payment, such as a cheaper one, and it would pass.
+
+Khalti sends the buyer back to `returnUrl` with `pidx`, `status`, `total_amount` and more in the query. Those values are not signed. Use the callback's pidx only to find the order, then verify the pidx you stored:
 
 ```ts
 const cb = await payments.khalti.parseCallback(req.url); // { ref: pidx, signed: false, ... }
-const result = await payments.khalti.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+const order = await findOrderByRef(cb.ref);               // the order whose stored start.ref is this pidx
+if (!order) return notFound();
+const result = await payments.khalti.verify({ ref: order.ref, expectedAmount: order.amount, expectedOrderId: order.id });
 if (result.paid) await markPaid(order, result.transactionId);
 ```
-
-The lookup API does not return the order id, so `result.checked.orderId` is `false` for Khalti. Match the pidx to your order yourself: store `start.ref` with the order and look the order up by it.
 
 ## Statuses
 

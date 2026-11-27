@@ -24,9 +24,13 @@ const start = await payments.khalti.initiate({
   returnUrl: 'https://shop.example/pay/khalti/return',
   websiteUrl: 'https://shop.example'
 });
+await saveOrderRef('order-42', start.ref); // your database
 
-// 2. On the return URL, on your server:
-const result = await payments.khalti.verify({ ref: start.ref, expectedAmount: rupees(100), expectedOrderId: 'order-42' });
+// 2. On the return URL, on your server. Use the callback's pidx only to find the order,
+//    then verify the pidx you stored (Khalti's lookup has no order id to check).
+const cb = await payments.khalti.parseCallback(returnUrl);
+const order = await findOrderByRef(cb.ref); // your database
+const result = await payments.khalti.verify({ ref: order.ref, expectedAmount: order.amount, expectedOrderId: order.id });
 if (result.paid) {
   // ship the order
 }

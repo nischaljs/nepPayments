@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   const order = await findOrderByRef(cb.ref);
   if (!order) return new NextResponse('Unknown payment', { status: 404 });
   try {
-    const result = await payments.khalti.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+    const result = await payments.khalti.verify({ ref: order.ref, expectedAmount: order.amount, expectedOrderId: order.id });
     if (result.paid) await markPaid(order.id, result.transactionId);
     return NextResponse.redirect(new URL(result.paid ? '/thanks' : `/checkout?status=${result.status}`, request.url));
   } catch (e) {

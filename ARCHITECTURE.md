@@ -13,12 +13,14 @@ The package is a socket and plugs.
 | 1 | Core never imports a gateway, compat or testing. | dependency-cruiser `core-never-imports-gateways` |
 | 2 | A gateway imports the core only through `src/core/index.ts`, and never another gateway. | `gateway-imports-only-core-index`, `gateways-never-import-each-other` |
 | 3 | No runtime dependencies. Node 18 built-ins and `fetch` only. | `no-runtime-dependencies`, package.json |
-| 4 | Every error that leaves a client is a `PaymentError`, cleaned by the client's redactor. A plug's unexpected error becomes `INVALID_RESPONSE`. | `connect()` in `src/core/socket.ts` |
+| 4 | Every error that leaves a client is a `PaymentError`, cleaned by that call's redactor (a copy of the client's, made per call, so values a plug adds for one call, such as a ConnectIPS token, do not pile up). A plug's unexpected error becomes `INVALID_RESPONSE`. | `connect()` in `src/core/socket.ts` |
 | 5 | Every status is a returned value. Only input, config, signature, mismatch and network problems throw. | `Plug` types, tests |
 | 6 | `verify` takes `expectedAmount` in paisa and `expectedOrderId`, and the socket compares them with what the gateway reports. A paid result with no amount is `INVALID_RESPONSE`. | `connect()`, tests |
 | 7 | A plug lists every secret in `secrets(config)`. They never appear in an error, a result's `raw`, `String()`, `JSON.stringify` or `util.inspect`. | Redactor, tests |
-| 8 | Mock mode needs no keys and makes no network call, for every plug. | `connect()`, tests |
+| 8 | Mock mode needs no keys and makes no network call, for every plug. It is refused when `NODE_ENV` is `production`, and its refs carry an HMAC with a key made per process. | `connect()`, tests |
 | 9 | Amounts are integer paisa everywhere in the public API. A plug converts to the gateway's unit itself. | `Paisa` brand |
+
+**Note on rule 6: Khalti does not bind the order.** The Khalti lookup answer has no `purchase_order_id`, so `reportsOrderId` is false and the socket cannot compare `expectedOrderId`. For Khalti, the order binding is the pidx the merchant stored: store `start.ref` with the order at initiate, and verify only that stored pidx. Never verify a pidx taken from the callback URL, because a buyer can put the pidx of another, cheaper payment there. The callback's pidx is only a key to find the order.
 
 ## Add a gateway in 5 steps
 

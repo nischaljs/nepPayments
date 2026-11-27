@@ -56,7 +56,7 @@ export class PaymentsController {
     const cb = await this.payments.khalti.parseCallback(req.originalUrl);
     const order = await this.orders.findByRef(cb.ref);
     try {
-      const result = await this.payments.khalti.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+      const result = await this.payments.khalti.verify({ ref: order.ref, expectedAmount: order.amount, expectedOrderId: order.id });
       if (result.paid) await this.orders.markPaid(order.id, result.transactionId);
       return { url: result.paid ? '/thanks' : `/checkout?status=${result.status}` };
     } catch (e) {

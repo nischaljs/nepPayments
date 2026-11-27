@@ -31,7 +31,7 @@ app.get('/pay/khalti/return', async (req, res) => {
   const order = [...orders.values()].find(o => o.ref === cb.ref);
   if (!order) return res.status(404).send('Unknown payment');
   try {
-    const result = await payments.khalti.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+    const result = await payments.khalti.verify({ ref: order.ref, expectedAmount: order.amount, expectedOrderId: order.id });
     order.paid = result.paid;
     res.redirect(result.paid ? '/thanks' : `/pay/retry?status=${result.status}`);
   } catch (e) {
