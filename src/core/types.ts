@@ -66,7 +66,7 @@ export interface VerifyInput {
    * Optional, but pass it for eSewa: the eSewa status API only echoes the amount you send,
    * so the signed callback's amount is the real amount check there.
    * It is what `parseCallback` returned for this payment, the same object, not a copy
-   * (a copy counts as unsigned). When it is signed (eSewa, the Hamro Pay webhook), its
+   * (a copy that says signed throws INVALID_INPUT; run parseCallback again on the raw callback). When it is signed (eSewa, the Hamro Pay webhook), its
    * amount and order id are compared with your expected values.
    */
   callback?: CallbackResult;

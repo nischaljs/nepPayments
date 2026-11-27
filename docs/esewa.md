@@ -45,6 +45,8 @@ if (result.paid) await markPaid(order, result.transactionId);
 
 **Pass `callback: cb` to verify.** The eSewa status API is asked with `total_amount` and answers with the same `total_amount`: the amount it reports is an echo of the amount you sent, not a separate check. The signed callback carries eSewa's own `total_amount`. With `callback`, verify compares that signed amount (and its `transaction_uuid`) with your expected values and throws `AMOUNT_MISMATCH` or `ORDER_MISMATCH`; `result.checked.callback` is then `true`. Without it, `result.checked.amount` only means the echo matched.
 
+Pass the exact object `parseCallback` returned. A stored or copied callback result (JSON, `structuredClone`, a spread) that says `signed: true` throws `INVALID_INPUT`: run `parseCallback` again on the raw callback first.
+
 A signed callback is still not enough to ship alone: verify also asks the status API for the status. eSewa has no refund API.
 
 ## Statuses

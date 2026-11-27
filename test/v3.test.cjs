@@ -229,8 +229,10 @@ test('esewa: verify compares a signed callback amount, since the status API echo
   const u = await p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: unsigned });
   assert.equal(u.checked.callback, false);
   // signed: true set by hand on a copy is not trusted: only parseCallback's own result counts.
-  const faked = await p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: { ...unsigned, signed: true } });
-  assert.equal(faked.checked.callback, false);
+  await rejects(p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: { ...unsigned, signed: true } }), 'INVALID_INPUT');
+  // A stored copy of a real signed result is not trusted either: run parseCallback again.
+  await rejects(p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: JSON.parse(JSON.stringify(good)) }), 'INVALID_INPUT');
+  await rejects(p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: structuredClone(good) }), 'INVALID_INPUT');
   // The ESM build's parseCallback result is trusted by the CommonJS build's verify.
   const esm = await import('../dist/index.mjs');
   const pe = esm.createPayments({ mode: 'sandbox', fetch: fakeFetch(fake.handler), esewa: { productCode: 'EPAYTEST', secretKey: ESEWA_SECRET } });

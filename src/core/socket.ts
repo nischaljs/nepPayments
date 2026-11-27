@@ -193,7 +193,14 @@ export function connect<C, E, S, I, CB, SI, RI>(
   // A signed callback carries the gateway's own amount and order id. Compare them too.
   const checkCallback = (input: VerifyInput): boolean => {
     const cb = input.callback;
-    if (!cb || !cb.signed || !SIGNED.has(cb)) return false;
+    if (!cb || !cb.signed) return false;
+    if (!SIGNED.has(cb)) {
+      fail({
+        code: 'INVALID_INPUT',
+        field: 'callback',
+        message: `verify callback says signed, but it is not the object ${gateway}.parseCallback returned. Pass that exact object, or run parseCallback again on the raw callback (a stored or copied result is not trusted).`
+      });
+    }
     if (cb.orderId !== null && cb.orderId !== input.expectedOrderId) {
       fail({ code: 'ORDER_MISMATCH', message: `The signed ${gateway} callback names order ${JSON.stringify(cb.orderId)}, but you expected ${JSON.stringify(input.expectedOrderId)}. Do not ship this order.` });
     }
