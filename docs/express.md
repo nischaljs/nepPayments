@@ -53,7 +53,7 @@ app.get('/pay/esewa/:orderId', async (req, res) => {
 app.get('/pay/esewa/success', async (req, res) => {
   const cb = await payments.esewa.parseCallback(req.originalUrl); // throws INVALID_SIGNATURE on a forged callback
   const order = orders.get(cb.ref)!;
-  const result = await payments.esewa.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+  const result = await payments.esewa.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id, callback: cb }); // the signed callback's amount is checked too
   order.paid = result.paid;
   res.redirect(result.paid ? '/thanks' : `/pay/retry?status=${result.status}`);
 });

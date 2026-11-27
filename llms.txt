@@ -2,7 +2,7 @@
 
 > Khalti, eSewa, ConnectIPS and Hamro Pay payments for Node.js and Next.js. One typed TypeScript API to start and verify payments from Nepal's gateways. Server only, Node 18+, zero runtime dependencies.
 
-Start with `createPayments({ mode: 'sandbox' | 'live' | 'mock', khalti?, esewa?, connectips?, hamropay? })`. Each gateway client has `initiate`, `parseCallback`, `verify({ ref, expectedAmount, expectedOrderId })`, `status` (the gateway's report with no checks and no `paid` field; not for fulfilment), and (Khalti) `refund`. Amounts are integer paisa (`rupees(100)`). Check errors with `isPaymentError(e)`, not `instanceof`, and read `e.code`. Ship only when `verify(...).paid` is true. Khalti's lookup has no order id: store `start.ref` (the pidx) at initiate and verify only that stored pidx, never the pidx from the callback URL.
+Start with `createPayments({ mode: 'sandbox' | 'live' | 'mock', khalti?, esewa?, connectips?, hamropay? })`. Each gateway client has `initiate`, `parseCallback`, `verify({ ref, expectedAmount, expectedOrderId })`, `status` (the gateway's report with no checks and no `paid` field; not for fulfilment), and (Khalti) `refund`. Amounts are integer paisa (`rupees(100)`). Check errors with `isPaymentError(e)`, not `instanceof`, and read `e.code`. Ship only when `verify(...).paid` is true. For eSewa, pass the signed callback to verify (`callback: cb`): the status API only echoes the amount you send. Khalti's lookup has no order id: store `start.ref` (the pidx) at initiate and verify only that stored pidx, never the pidx from the callback URL.
 
 ## Docs
 

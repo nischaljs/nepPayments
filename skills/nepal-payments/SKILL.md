@@ -15,6 +15,7 @@ One typed API for Nepal's payment gateways. Server only. Node 18 or later.
    - `start.kind === 'form'` (eSewa, ConnectIPS, Hamro Pay): render a hidden form that posts `start.fields` to `start.action`, and submit it.
 3. On the return URL or webhook: `parseCallback(urlOrBody)` to read the ref. eSewa callbacks and Hamro Pay webhooks are signature-checked (`signed: true`); the others are not.
 4. Always `verify({ ref, expectedAmount, expectedOrderId })` on the server. Ship only when `result.paid` is true.
+   - eSewa: pass the signed callback to verify, `verify({ ..., callback: cb })`. The eSewa status API only echoes the amount you send, so the signed callback's amount is the real check.
 
 ## Rules
 
