@@ -6,19 +6,17 @@ Nepal payment gateways for Node.js and TypeScript. One API, zero runtime depende
 
 [![npm version](https://img.shields.io/npm/v/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
 [![npm downloads](https://img.shields.io/npm/dm/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
-[![license: MIT](https://img.shields.io/npm/l/nepal-payments)](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/LICENSE)
+[![license: MIT](https://img.shields.io/npm/l/nepal-payments)](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/LICENSE)
 [![types: included](https://img.shields.io/npm/types/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
-[![dependencies: 0](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/package.json)
+[![dependencies: 0](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/package.json)
 
 ## Verify your first payment locally
 
-Install the current seven-gateway build in a Node.js 18+ server project with Git available.
+Install the package in a Node.js 18+ server project.
 
 ```sh
-npm install github:nischaljs/nepal-payments#main
+npm install nepal-payments
 ```
-
-For the published four-gateway release candidate, use `npm install nepal-payments@next`.
 
 Save this as `checkout.mjs` and run **`node checkout.mjs`**. It runs entirely on your machine with no account, keys, or network requests.
 
@@ -46,7 +44,7 @@ To try a pending payment, add `mockOutcome: 'pending'` to the initiate input. A 
 
 Your server uses one SDK with a client for each enabled gateway. Your app owns checkout routes, order records and fulfilment. Each provider or acquiring bank issues its own merchant credentials and handles its payment page or QR network.
 
-From your site’s server project, initialize the [environment template](.env.example) and [server module](examples/payments.mjs) with one command after installing a version containing these adapters:
+From your site’s server project, initialize the [environment template](.env.example) and [server module](examples/payments.mjs) with one command after installing the package:
 
 ```sh
 npx --no-install nepal-payments-init
@@ -85,7 +83,7 @@ node examples/try-payment.mjs fonepay pending
 node examples/try-payment.mjs bankcard paid
 ```
 
-**From an installed package containing these adapters**, run `npx --no-install nepal-payments-demo`. You can pass the same gateway and outcome arguments. The demo needs Node 18+, no credentials and no account. The current npm rc.2 predates these adapters.
+**From an installed package**, run `npx --no-install nepal-payments-demo`. You can pass the same gateway and outcome arguments. The demo needs Node 18+, no credentials and no account.
 
 | Checkout | Buyer experience | Sandbox setup |
 |---|---|---|
@@ -139,7 +137,7 @@ if (result.paid) {
 }
 ```
 
-Refunds: `payments.khalti.refund({ transactionId, amount? })`. Leave out `amount` for a full refund. Full guide: [docs/khalti.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/khalti.md).
+Refunds: `payments.khalti.refund({ transactionId, amount? })`. Leave out `amount` for a full refund. Full guide: [docs/khalti.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/docs/khalti.md).
 
 ### eSewa
 
@@ -169,7 +167,7 @@ if (result.paid) {
 }
 ```
 
-Pass `callback: cb`. The eSewa status API only repeats the amount you ask with, so the signed callback's amount is the real check. eSewa has no refund API. Full guide: [docs/esewa.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/esewa.md).
+Pass `callback: cb`. The eSewa status API only repeats the amount you ask with, so the signed callback's amount is the real check. eSewa has no refund API. Full guide: [docs/esewa.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/docs/esewa.md).
 
 ### ConnectIPS
 
@@ -200,7 +198,7 @@ const attempt = await findAttemptByRef(cb.ref); // your database
 const result = await payments.connectips.verify({ ref: attempt.ref, expectedAmount: attempt.amount, expectedOrderId: attempt.id });
 ```
 
-The form is signed with your RSA key from the `.pfx` NCHL gives you. NCHL documents a matching amount in its success response. Wrong-amount behavior still needs merchant sandbox confirmation. Full guide: [docs/connectips.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/connectips.md).
+The form is signed with your RSA key from the `.pfx` NCHL gives you. NCHL documents a matching amount in its success response. Wrong-amount behavior still needs merchant sandbox confirmation. Full guide: [docs/connectips.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/docs/connectips.md).
 
 ### Hamro Pay
 
@@ -233,7 +231,7 @@ const hook = await payments.hamropay.parseCallback({ body: rawBody, signature: s
 const result = await payments.hamropay.verify({ ref: hook.ref, expectedAmount: order.amount, expectedOrderId: order.id, callback: hook });
 ```
 
-Hamro Pay does not publish its live hosts, so `mode: 'live'` needs `endpoints: { api, gateway }` from Hamro Pay. Full guide: [docs/hamropay.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/hamropay.md).
+Hamro Pay does not publish its live hosts, so `mode: 'live'` needs `endpoints: { api, gateway }` from Hamro Pay. Full guide: [docs/hamropay.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/docs/hamropay.md).
 
 ### One gateway only
 
@@ -289,7 +287,7 @@ try {
 
 ## Mock mode and tests
 
-![A terminal in mock mode: npm install nepal-payments, a short script that starts a Khalti payment and verifies it, then the run. The first verify says paid = true. The second verify, with a different expected amount, stops with AMOUNT_MISMATCH.](https://raw.githubusercontent.com/nischaljs/nepal-payments/v3.0.0-rc.2/docs/media/demo.gif)
+![A terminal in mock mode: npm install nepal-payments, a short script that starts a Khalti payment and verifies it, then the run. The first verify says paid = true. The second verify, with a different expected amount, stops with AMOUNT_MISMATCH.](https://raw.githubusercontent.com/nischaljs/nepal-payments/v3.0.0/docs/media/demo.gif)
 
 **Mock mode** needs no keys and makes no network call. Use it for local runs and demos.
 
@@ -352,9 +350,9 @@ Then move each call to `createPayments` when you can. It checks the order id too
 
 This package is written so an AI coding agent gets payments right the first time. Three files ship inside it:
 
-- [`AGENTS.md`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/AGENTS.md): six rules for payment code. Verify on the server, amounts in paisa, secrets stay on the server, handle every status, verify the stored Khalti pidx, test without keys.
-- [`llms.txt`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/llms.txt): the API on one page, with links to every guide.
-- [`skills/nepal-payments/SKILL.md`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/skills/nepal-payments/SKILL.md): an agent skill for adding or reviewing payments.
+- [`AGENTS.md`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/AGENTS.md): six rules for payment code. Verify on the server, amounts in paisa, secrets stay on the server, handle every status, verify the stored Khalti pidx, test without keys.
+- [`llms.txt`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/llms.txt): the API on one page, with links to every guide.
+- [`skills/nepal-payments/SKILL.md`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/skills/nepal-payments/SKILL.md): an agent skill for adding or reviewing payments.
 
 After `npm install`, point your agent at them. For example, add this line to your project's `AGENTS.md` or `CLAUDE.md`:
 
@@ -372,19 +370,19 @@ The error messages are written for agents too. Each one names the field and says
 
 ## Framework guides
 
-- [Express](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/express.md): one file, Khalti and eSewa.
-- [Next.js App Router](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/nextjs.md): Route Handlers on the Node.js runtime.
-- [NestJS](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/nestjs.md): a provider and a controller.
+- [Express](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/docs/express.md): one file, Khalti and eSewa.
+- [Next.js App Router](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/docs/nextjs.md): Route Handlers on the Node.js runtime.
+- [NestJS](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/docs/nestjs.md): a provider and a controller.
 
 ## How it is built
 
-![How nepal-payments is built: your server code imports createPayments, a single gateway entry, compat or testing. The gateway plugs (Khalti, eSewa, ConnectIPS and Hamro Pay) are opt-in and sit in one socket, the core. The socket handles fetch with a timeout and no retries, secret removal, signing, the verify checks and mock mode, and talks to the gateway hosts, or to the fakes in tests.](https://raw.githubusercontent.com/nischaljs/nepal-payments/v3.0.0-rc.2/docs/media/architecture.svg)
+![How nepal-payments is built: your server code imports createPayments, a single gateway entry, compat or testing. The gateway plugs (Khalti, eSewa, ConnectIPS and Hamro Pay) are opt-in and sit in one socket, the core. The socket handles fetch with a timeout and no retries, secret removal, signing, the verify checks and mock mode, and talks to the gateway hosts, or to the fakes in tests.](https://raw.githubusercontent.com/nischaljs/nepal-payments/v3.0.0/docs/media/architecture.svg)
 
 - **The socket** (`src/core`) does everything that is the same for every gateway: HTTP with a timeout, removing secrets, signing, the money type, config checks, errors, mock mode and the checks in `verify`.
 - **A plug** (`src/gateways/<name>`) only knows its gateway: its config, its hosts and its request and answer shapes. It cannot skip the socket's checks.
 - **The entries** are `nepal-payments`, one subpath per gateway, `nepal-payments/testing` and `nepal-payments/compat`.
 
-`npm run depcheck` fails any import that breaks these rules. The rules, and how to add a gateway in five steps: [ARCHITECTURE.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/ARCHITECTURE.md).
+`npm run depcheck` fails any import that breaks these rules. The rules, and how to add a gateway in five steps: [ARCHITECTURE.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/ARCHITECTURE.md).
 
 ## Contributing
 
@@ -397,10 +395,10 @@ npm run check   # types, import rules, tests and a packed install
 
 - Tests run on fake gateways only. A test must never call a sandbox or live host.
 - Keep a gateway's code in its own plug. Shared work belongs in the socket.
-- Add a line to [CHANGELOG.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/CHANGELOG.md) for anything a user would notice.
+- Add a line to [CHANGELOG.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/CHANGELOG.md) for anything a user would notice.
 
 The pictures can be made again. `scripts/demo/record.sh` records the terminal GIF in mock mode, from the packed package (needs `rsvg-convert`, `ffmpeg` and the JetBrains Mono NL font). `docs/media/architecture.svg` is hand-written SVG.
 
 ## License
 
-[MIT](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/LICENSE)
+[MIT](https://github.com/nischaljs/nepal-payments/blob/v3.0.0/LICENSE)

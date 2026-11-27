@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
+## 3.0.0 (2026-11-27)
 
 - Add NEPALPAY Dynamic QR, Fonepay Dynamic QR, and Cybersource Secure Acceptance bank-hosted NPR sales. Try them locally with the bundled `nepal-payments-demo` command. Merchant UAT is pending.
-
+- Initialize a merchant project with `nepal-payments-init`, including a server module and environment template.
 - Check exact Hamro Pay webhook amounts and validate product lists and ConnectIPS merchant fields.
 - Support read-only ConnectIPS transaction details through `status({ ref, amount, details: true })`.
 - Add credential-free mock configuration types, a first-payment walkthrough, and an offline SQLite checkout example.

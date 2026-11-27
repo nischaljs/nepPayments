@@ -1,7 +1,7 @@
 {
   "name": "nepal-payments",
-  "version": "3.0.0-rc.2",
-  "description": "Khalti, eSewa, ConnectIPS and Hamro Pay payments for Node.js and TypeScript. One API to start and verify payments from Nepal's gateways, with amount checks built in. Zero runtime dependencies. Built for coding agents too.",
+  "version": "3.0.0",
+  "description": "Server-side payments for Nepal in Node.js and TypeScript. Khalti, eSewa, connectIPS, Hamro Pay, NEPALPAY QR, Fonepay QR and bank-hosted card checkout with zero runtime dependencies.",
   "keywords": [
     "nepal",
     "payment",
