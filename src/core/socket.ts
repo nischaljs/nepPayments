@@ -28,6 +28,10 @@ export interface PlugContext<C, E, S> {
   /** What the plug's `prepare` returned (for example a loaded RSA key). */
   state: S;
   http: Http;
+  /**
+   * This call's redactor: the client's secrets plus anything the plug adds
+   * during the call (such as a per-order token). It is dropped after the call.
+   */
   redactor: Redactor;
   /** Throw a PaymentError for this gateway. */
   fail(init: Omit<PaymentErrorInit, 'gateway'>): never;
@@ -98,7 +102,7 @@ export function connect<C, E, S, I, CB, SI, RI>(
   };
 
   // Turn anything thrown inside a plug into a clean PaymentError with secrets removed.
-  const clean = (err: unknown): PaymentError => {
+  const clean = (err: unknown, redactor: Redactor): PaymentError => {
     if (isPaymentError(err)) {
       return new PaymentError({
         code: err.code,
@@ -110,15 +114,18 @@ export function connect<C, E, S, I, CB, SI, RI>(
     }
     return new PaymentError({ code: 'INVALID_RESPONSE', gateway, message: `${gateway} sent an answer this library could not read.` });
   };
-  const guard = async <T>(fn: () => T | Promise<T>): Promise<T> => {
+  // Every call gets its own redactor, forked from the client's, so values a plug adds
+  // for one call never grow the client's redactor.
+  const guard = async <T>(fn: (call: Call) => T | Promise<T>): Promise<T> => {
+    const call = scope();
     try {
-      return await fn();
+      return await fn(call);
     } catch (err) {
-      throw clean(err);
+      throw clean(err, call.redactor);
     }
   };
 
-  let ctx: PlugContext<C, E, S> | null = null;
+  let base: PlugContext<C, E, S> | null = null;
   if (mode !== 'mock') {
     const endpoints = { ...(plug.endpoints[mode === 'live' ? 'live' : 'sandbox'] ?? {}), ...(config.endpoints ?? {}) } as E;
     if (mode === 'live' && !plug.endpoints.live && !hasAll(endpoints as object, plug.endpoints.sandbox as object)) {
@@ -132,9 +139,9 @@ export function connect<C, E, S, I, CB, SI, RI>(
     try {
       state = plug.prepare ? plug.prepare(config, mode) : (undefined as S);
     } catch (err) {
-      throw clean(err);
+      throw clean(err, redactor);
     }
-    ctx = {
+    base = {
       gateway,
       mode,
       config,
@@ -150,6 +157,13 @@ export function connect<C, E, S, I, CB, SI, RI>(
     };
   }
 
+  type Call = { redactor: Redactor; ctx: PlugContext<C, E, S> | null };
+  const scope = (): Call => {
+    const r = redactor.fork();
+    if (!base) return { redactor: r, ctx: null };
+    return { redactor: r, ctx: { ...base, redactor: r, http: createHttp({ gateway, timeoutMs: options.timeoutMs ?? 15000, fetch: options.fetch, redactor: r }) } };
+  };
+
   const check = (input: VerifyInput) => {
     if (!input || typeof input.ref !== 'string' || !input.ref) fail({ code: 'INVALID_INPUT', field: 'ref', message: 'verify needs ref: the ref initiate returned, stored with your order.' });
     if (typeof input.expectedOrderId !== 'string' || !input.expectedOrderId) {
@@ -159,7 +173,7 @@ export function connect<C, E, S, I, CB, SI, RI>(
     paisa(input.expectedAmount);
   };
 
-  const finish = (r: PlugVerify): StatusResult => {
+  const finish = (r: PlugVerify, redactor: Redactor): StatusResult => {
     if (!STATUSES.includes(r.status)) fail({ code: 'INVALID_RESPONSE', message: `${gateway} plug returned an unknown status.` });
     return Object.freeze({ gateway, ...r, raw: redactor.value(r.raw), paid: r.status === 'paid' });
   };
@@ -178,7 +192,7 @@ export function connect<C, E, S, I, CB, SI, RI>(
     mode,
 
     initiate: input =>
-      guard(async () => {
+      guard(async ({ ctx, redactor }) => {
         const { amount, orderId } = plug.describe(input);
         paisa(amount);
         if (!orderId) fail({ code: 'INVALID_INPUT', field: 'orderId', message: 'initiate needs orderId: your own unique order id.' });
@@ -196,9 +210,9 @@ export function connect<C, E, S, I, CB, SI, RI>(
       }),
 
     verify: input =>
-      guard(async () => {
+      guard(async ({ ctx, redactor }) => {
         check(input);
-        const r = finish(ctx ? await plug.verify(ctx, input) : mockVerify(input.ref));
+        const r = finish(ctx ? await plug.verify(ctx, input) : mockVerify(input.ref), redactor);
         if (r.ref !== input.ref) {
           fail({ code: 'INVALID_RESPONSE', message: `${gateway} answered for a different ref than the one asked.`, response: { status: 200, data: r.raw } });
         }
@@ -235,7 +249,7 @@ export function connect<C, E, S, I, CB, SI, RI>(
       }),
 
     parseCallback: input =>
-      guard(() => {
+      guard(({ ctx, redactor }) => {
         if (!ctx) {
           const values = Object.values((input ?? {}) as Record<string, unknown>).filter((v): v is string => typeof v === 'string');
           const ref = values.find(v => v.startsWith('mock.'));
@@ -250,17 +264,17 @@ export function connect<C, E, S, I, CB, SI, RI>(
       }),
 
     status: input =>
-      guard(async () => {
+      guard(async ({ ctx, redactor }) => {
         if (!ctx) {
           const ref = typeof input === 'string' ? input : (input as { ref?: string } | null)?.ref;
-          return finish(mockVerify(String(ref)));
+          return finish(mockVerify(String(ref)), redactor);
         }
         if (!plug.status) return notSupported('status call');
-        return finish(await plug.status(ctx, input));
+        return finish(await plug.status(ctx, input), redactor);
       }),
 
     refund: input =>
-      guard(async () => {
+      guard(async ({ ctx, redactor }) => {
         if (!plug.refund) return notSupported('refund');
         if (!ctx) return Object.freeze({ gateway, ok: true as const, raw: { mock: true } });
         const raw = await plug.refund(ctx, input);

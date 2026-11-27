@@ -99,12 +99,18 @@ function query(input: ConnectIpsCallbackInput): Record<string, string> {
   return out;
 }
 
+function basicAuth(config: ConnectIpsConfig): string | undefined {
+  if (typeof config?.appId !== 'string' || typeof config?.password !== 'string') return undefined;
+  return Buffer.from(`${config.appId}:${config.password}`, 'utf8').toString('base64');
+}
+
 async function validate(ctx: Ctx, ref: string, amount: Paisa): Promise<PlugVerify> {
   const merchantId = String(ctx.config.merchantId);
   const txnAmt = String(amount);
   const token = rsaSha256Sign(connectIpsValidateMessage(merchantId, ctx.config.appId, ref, txnAmt), ctx.state);
-  const basic = Buffer.from(`${ctx.config.appId}:${ctx.config.password}`, 'utf8').toString('base64');
-  ctx.redactor.add(basic, token);
+  const basic = basicAuth(ctx.config) as string;
+  // ctx.redactor lives for this call only, so the per-order token does not pile up.
+  ctx.redactor.add(token);
   const res = await ctx.http.send({
     method: 'POST',
     url: `${ctx.endpoints.base}/connectipswebws/api/creditor/validatetxn`,
@@ -143,7 +149,7 @@ export const connectIpsPlug: Plug<ConnectIpsConfig, ConnectIpsEndpoints, KeyObje
     endpoints: { type: 'object', hint: 'Pass { base } with the host NCHL gave you, or leave it out.' }
   },
   endpoints: CONNECTIPS_ENDPOINTS,
-  secrets: c => [c.password, c.pfxPassword, c.privateKeyPem],
+  secrets: c => [c.password, c.pfxPassword, c.privateKeyPem, basicAuth(c)],
   reportsOrderId: true,
   startKind: 'form',
   describe: i => ({ amount: i?.amount, orderId: i?.orderId }),

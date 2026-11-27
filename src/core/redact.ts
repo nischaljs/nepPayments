@@ -18,6 +18,21 @@ export class Redactor {
     this.secrets.sort((a, b) => b.length - a.length);
   }
 
+  /**
+   * A new redactor that starts with this one's secrets. Values added to the
+   * copy stay in the copy, so per-call values never pile up in a shared one.
+   */
+  fork(): Redactor {
+    const r = new Redactor();
+    r.secrets.push(...this.secrets);
+    return r;
+  }
+
+  /** How many secret strings it holds. */
+  get size(): number {
+    return this.secrets.length;
+  }
+
   text(value: string): string {
     let out = value;
     for (const s of this.secrets) out = out.split(s).join(REDACTED);

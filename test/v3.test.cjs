@@ -251,6 +251,28 @@ test('connectips: validatetxn call, statuses and mismatches', async () => {
   assert.deepEqual({ ref: cb.ref, status: cb.status, signed: cb.signed }, { ref: 'o-1', status: 'pending', signed: false });
 });
 
+test('connectips: many verifies do not grow the shared redactor; each call hides its own token', async () => {
+  const fake = fakeConnectIps();
+  const tokens = [];
+  let echo = false;
+  const fetch = fakeFetch(async req => {
+    tokens.push(JSON.parse(await req.text()).token);
+    if (!echo) return undefined;
+    return new Response(JSON.stringify({ message: tokens.join(' ') }), { status: 500, headers: { 'content-type': 'application/json' } });
+  }, fake.handler);
+  const p = createPayments({ mode: 'sandbox', fetch, connectips: { ...CIPS, pfx: fixture('test-aes.pfx') } });
+  const runs = 50;
+  for (let n = 0; n < runs; n++) await p.connectips.verify({ ref: `o-${n}`, expectedAmount: paisa(500 + n), expectedOrderId: `o-${n}` });
+  echo = true;
+  const e = await rejects(p.connectips.verify({ ref: 'o-last', expectedAmount: paisa(500), expectedOrderId: 'o-last' }), 'GATEWAY_ERROR');
+  const seen = [e.message, JSON.stringify(e.response), util.inspect(e, { depth: 20 })].join('\n');
+  assert.equal(new Set(tokens).size, runs + 1);
+  assert.ok(!seen.includes(tokens[runs]), 'this call\'s token leaked');
+  assert.ok(!seen.includes(Buffer.from(`${CIPS.appId}:${CIPS.password}`).toString('base64')), 'basic auth leaked');
+  // The earlier calls' tokens were never added to the shared redactor, so it did not grow with them.
+  assert.equal(tokens.slice(0, runs).filter(t => seen.includes(t)).length, runs);
+});
+
 // ---------- Hamro Pay ----------
 test('hamropay: signature is base64 HMAC-SHA512 of the comma join (openssl vector)', () => {
   assert.equal(np.hamroPaySignature(['T1', '1000', 'M', 'C', 'K'], 'abcdefg'), '7MhTBtP9MzyiNUg7P/ljNqxHxrUPQSAHhNpAD9bPlacsF2lMj8GAka1pVKD7MSMnNdBLqCwz9SoY4l+2RHdpxA==');
