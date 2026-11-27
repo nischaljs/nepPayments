@@ -29,7 +29,7 @@ One typed API for Nepal's payment gateways. Server only. Node 18 or later.
 
 ## Tests
 
-- `mode: 'mock'`: no keys, no network. `initiate({ ..., mockOutcome: 'failed' })` picks the outcome; `verify` follows it.
+- `mode: 'mock'`: no keys, no network. `initiate({ ..., mockOutcome: 'failed' })` picks the outcome; `verify` follows it. Mock mode is refused when `NODE_ENV` is `production` (INVALID_CONFIG). Mock refs are signed with a key made per process, so a typed ref fails, and a ref works only in the process that made it (not after a restart or on another instance).
 - `import { fakeFetch, fakeKhalti, fakeEsewa, fakeConnectIps, fakeHamroPay, esewaCallback, hamroPayWebhook } from 'nepal-payments/testing'`, then `createPayments({ mode: 'sandbox', fetch: fakeFetch(fake.handler), ... })`. `fake.set(ref, { status, amount })` sets what the gateway reports. The handlers also work with MSW.
 - Never call a real sandbox or live host from a test.
 

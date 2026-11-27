@@ -12,7 +12,7 @@ New package name: `nepal-payments` (was `nep-payments`). Release candidate.
 - Statuses `paid`, `pending`, `failed`, `canceled`, `refunded`, `expired`, `ambiguous`. eSewa AMBIGUOUS and Khalti Refunded keep their own status.
 - `verify` checks the amount and, where the gateway reports it, the order id.
 - Amounts are integer paisa everywhere (`paisa`, `rupees`, `toRupeeString`).
-- `mode: 'mock'`: no keys, no network.
+- `mode: 'mock'`: no keys, no network. Mock mode is refused when `NODE_ENV` is `production` (INVALID_CONFIG). Mock refs are signed with a key made per process, so a typed ref fails, and a ref works only in the process that made it (not after a restart or on another instance).
 - `nepal-payments/testing`: `fakeFetch` and fake handlers for each gateway, `esewaCallback`, `hamroPayWebhook`.
 - Subpath entries `nepal-payments/khalti`, `/esewa`, `/connectips`, `/hamropay`. ESM and CommonJS, with types.
 - `AGENTS.md`, `llms.txt`, an agent skill, and docs per gateway with Express, Next.js and NestJS recipes.

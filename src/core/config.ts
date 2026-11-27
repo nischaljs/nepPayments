@@ -29,6 +29,13 @@ export function validateConfig(gateway: string, schema: Schema, config: unknown,
       message: `${gateway}.mode must be 'sandbox', 'live' or 'mock', got ${describe(mode, true)}. Use 'sandbox' while testing.`
     });
   }
+  if (mode === 'mock' && typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+    throw new PaymentError({
+      code: 'INVALID_CONFIG',
+      field: `${gateway}.mode`,
+      message: `${gateway}.mode is 'mock' while NODE_ENV is 'production'. Mock mode accepts payments that never happened, so it is refused in production. Use 'live'.`
+    });
+  }
   if (!config || typeof config !== 'object') {
     throw new PaymentError({ code: 'INVALID_CONFIG', field: gateway, message: `${gateway} config must be an object.` });
   }

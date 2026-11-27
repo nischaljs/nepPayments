@@ -351,6 +351,34 @@ test('mock mode: no keys, no network, outcome follows mockOutcome', async () => 
   await rejects(p.esewa.refund({}), 'NOT_SUPPORTED');
 });
 
+test('mock mode: a typed or changed ref fails; refused when NODE_ENV is production', async () => {
+  const p = createPayments({ mode: 'mock', khalti: {} });
+  const input = { amount: rupees(10), orderId: 'o-1', orderName: 'n', returnUrl: 'https://a.example', websiteUrl: 'https://a.example' };
+  const { ref } = await p.khalti.initiate(input);
+  const order = Buffer.from('o-1').toString('base64url');
+  const typed = `mock.paid.1000.${order}.abc`;
+  await rejects(p.khalti.verify({ ref: typed, expectedAmount: rupees(10), expectedOrderId: 'o-1' }), 'INVALID_INPUT');
+  await rejects(p.khalti.verify({ ref: typed + '.forged', expectedAmount: rupees(10), expectedOrderId: 'o-1' }), 'INVALID_INPUT');
+  const parts = ref.split('.');
+  const cheaper = [parts[0], parts[1], '100', ...parts.slice(3)].join('.');
+  await rejects(p.khalti.verify({ ref: cheaper, expectedAmount: rupees(1), expectedOrderId: 'o-1' }), 'INVALID_INPUT');
+  const failed = (await p.khalti.initiate({ ...input, mockOutcome: 'failed' })).ref.split('.');
+  const flipped = [failed[0], 'paid', ...failed.slice(2)].join('.');
+  await rejects(p.khalti.verify({ ref: flipped, expectedAmount: rupees(10), expectedOrderId: 'o-1' }), 'INVALID_INPUT');
+  assert.equal((await p.khalti.verify({ ref, expectedAmount: rupees(10), expectedOrderId: 'o-1' })).paid, true);
+
+  const before = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  try {
+    assert.throws(() => createPayments({ mode: 'mock', khalti: {} }), e => e.code === 'INVALID_CONFIG' && e.field === 'khalti.mode');
+    assert.throws(() => createPayments({ mode: 'sandbox', khalti: { secretKey: 'k', mode: 'mock' } }), e => e.code === 'INVALID_CONFIG');
+    assert.ok(createPayments({ mode: 'sandbox', khalti: { secretKey: 'k' } }).khalti);
+  } finally {
+    if (before === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = before;
+  }
+});
+
 test('subpath entries share one PaymentError class', () => {
   const k = require('../dist/khalti');
   const e = require('../dist/esewa');
