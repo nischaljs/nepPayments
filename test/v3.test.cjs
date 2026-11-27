@@ -103,7 +103,7 @@ test('khalti: verify paid, amount mismatch, statuses', async () => {
   assert.equal(v.status, 'paid');
   assert.equal(v.paid, true);
   assert.equal(v.amount, 1000);
-  assert.deepEqual(v.checked, { amount: true, orderId: false });
+  assert.deepEqual(v.checked, { amount: true, orderId: false, callback: false });
   assert.ok(Object.isFrozen(v));
   const st = await p.khalti.status(s.ref);
   assert.equal(st.status, 'paid');
@@ -198,7 +198,7 @@ test('esewa: verify statuses and mismatches', async () => {
   const p = all(fakeFetch(fake.handler));
   const v = await p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1' });
   assert.equal(v.status, 'paid');
-  assert.deepEqual(v.checked, { amount: true, orderId: true });
+  assert.deepEqual(v.checked, { amount: true, orderId: true, callback: false });
   assert.equal(fake.calls[0].body.total_amount, '100');
   fake.set('o-1', { amount: rupees(50) });
   await rejects(p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1' }), 'AMOUNT_MISMATCH');
@@ -210,6 +210,24 @@ test('esewa: verify statuses and mismatches', async () => {
     assert.equal(r.status, want, raw);
   }
   assert.equal(np.esewaStatus('COMPLETE'), 'paid');
+});
+
+test('esewa: verify compares a signed callback amount, since the status API echoes the amount sent', async () => {
+  const fake = fakeEsewa();
+  const p = all(fakeFetch(fake.handler));
+  const good = await p.esewa.parseCallback({ data: esewaCallback({ orderId: 'o-1', amount: rupees(100), secretKey: ESEWA_SECRET }) });
+  const v = await p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: good });
+  assert.deepEqual(v.checked, { amount: true, orderId: true, callback: true });
+  // The buyer paid Rs 50; the status API, asked with Rs 100, answers Rs 100. The signed callback still says Rs 50.
+  const cheap = await p.esewa.parseCallback({ data: esewaCallback({ orderId: 'o-1', amount: rupees(50), secretKey: ESEWA_SECRET }) });
+  await rejects(p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: cheap }), 'AMOUNT_MISMATCH');
+  const other = await p.esewa.parseCallback({ data: esewaCallback({ orderId: 'o-9', amount: rupees(100), secretKey: ESEWA_SECRET }) });
+  await rejects(p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: other }), 'INVALID_INPUT');
+  await rejects(p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: { ...good, gateway: 'khalti' } }), 'INVALID_INPUT');
+  // An unsigned callback is only a hint: its amount is not compared.
+  const unsigned = { ...cheap, signed: false };
+  const u = await p.esewa.verify({ ref: 'o-1', expectedAmount: rupees(100), expectedOrderId: 'o-1', callback: unsigned });
+  assert.equal(u.checked.callback, false);
 });
 
 // ---------- ConnectIPS ----------

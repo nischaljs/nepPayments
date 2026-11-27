@@ -38,11 +38,14 @@ const start = await payments.esewa.initiate({
 ```ts
 const cb = await payments.esewa.parseCallback(req.url); // or { data } or the raw base64 string
 // cb.signed === true: the signature was checked. A bad one throws INVALID_SIGNATURE.
-const result = await payments.esewa.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+const order = await findOrder(cb.ref);
+const result = await payments.esewa.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id, callback: cb });
 if (result.paid) await markPaid(order, result.transactionId);
 ```
 
-A signed callback is still not enough to ship: the status API is the source of truth. eSewa has no refund API.
+**Pass `callback: cb` to verify.** The eSewa status API is asked with `total_amount` and answers with the same `total_amount`: the amount it reports is an echo of the amount you sent, not a separate check. The signed callback carries eSewa's own `total_amount`. With `callback`, verify compares that signed amount (and its `transaction_uuid`) with your expected values and throws `AMOUNT_MISMATCH` or `ORDER_MISMATCH`; `result.checked.callback` is then `true`. Without it, `result.checked.amount` only means the echo matched.
+
+A signed callback is still not enough to ship alone: verify also asks the status API for the status. eSewa has no refund API.
 
 ## Statuses
 

@@ -62,6 +62,12 @@ export interface VerifyInput {
   expectedAmount: Paisa;
   /** Your order id, from your own database. */
   expectedOrderId: string;
+  /**
+   * Optional: what `parseCallback` returned for this payment. When it is signed
+   * (eSewa, the Hamro Pay webhook), its amount and order id are compared too.
+   * This matters most for eSewa, where the status API only echoes the amount you sent.
+   */
+  callback?: CallbackResult;
 }
 
 /** What every `verify` returns. */
@@ -77,8 +83,12 @@ export interface VerifyResult {
   amount: Paisa | null;
   /** The gateway's transaction id, when there is one. */
   transactionId: string | null;
-  /** Which checks ran: the amount always when the gateway reports one; the order id when the gateway reports one. */
-  checked: { amount: boolean; orderId: boolean };
+  /**
+   * Which checks ran: `amount` when the gateway reports one (for eSewa and ConnectIPS that is an echo
+   * of the amount sent, see their docs); `orderId` when the gateway reports one; `callback` when a
+   * signed callback was passed and its amount was compared.
+   */
+  checked: { amount: boolean; orderId: boolean; callback: boolean };
   /** The gateway's own status word, unchanged. */
   rawStatus: string;
   /** The gateway's full answer, secrets removed. */

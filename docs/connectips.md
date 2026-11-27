@@ -48,6 +48,8 @@ const result = await payments.connectips.verify({ ref: cb.ref, expectedAmount: o
 
 `verify` posts `{ merchantId, appId, referenceId, txnAmt, token }` to `{base}/connectipswebws/api/creditor/validatetxn`, where `token` signs `MERCHANTID=…,APPID=…,REFERENCEID=…,TXNAMT=…`.
 
+**The amount check is an echo.** validatetxn is asked with `txnAmt` (your expected amount) and answers with the `txnAmt` it was asked about. So `result.checked.amount` only says the echo matched, not that connectIPS charged that amount. It is not known yet whether connectIPS answers SUCCESS when `txnAmt` differs from the amount paid. Until there are sandbox tests that settle this, treat the amount check for connectIPS as an echo, and compare the amount in your connectIPS merchant report when it matters.
+
 ## Statuses
 
 | connectIPS | nepal-payments |

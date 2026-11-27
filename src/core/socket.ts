@@ -172,6 +172,29 @@ export function connect<C, E, S, I, CB, SI, RI>(
     }
     if (input.expectedAmount === undefined) fail({ code: 'INVALID_INPUT', field: 'expectedAmount', message: 'verify needs expectedAmount in paisa, from your database. Never take it from the callback.' });
     paisa(input.expectedAmount);
+    const cb = input.callback;
+    if (cb !== undefined) {
+      if (!cb || typeof cb !== 'object' || cb.gateway !== gateway) {
+        fail({ code: 'INVALID_INPUT', field: 'callback', message: `verify callback must be what ${gateway}.parseCallback returned.` });
+      }
+      if (cb.ref !== input.ref) {
+        fail({ code: 'INVALID_INPUT', field: 'callback', message: 'The callback is for a different ref than the one you verify. Verify the ref you stored with the order.' });
+      }
+    }
+  };
+
+  // A signed callback carries the gateway's own amount and order id. Compare them too.
+  const checkCallback = (input: VerifyInput): boolean => {
+    const cb = input.callback;
+    if (!cb || !cb.signed) return false;
+    if (cb.orderId !== null && cb.orderId !== input.expectedOrderId) {
+      fail({ code: 'ORDER_MISMATCH', message: `The signed ${gateway} callback names order ${JSON.stringify(cb.orderId)}, but you expected ${JSON.stringify(input.expectedOrderId)}. Do not ship this order.` });
+    }
+    if (cb.amount === null) return false;
+    if (cb.amount !== input.expectedAmount) {
+      fail({ code: 'AMOUNT_MISMATCH', message: `The signed ${gateway} callback says ${cb.amount} paisa for ref ${input.ref}, but you expected ${input.expectedAmount} paisa. Do not ship this order.` });
+    }
+    return true;
   };
 
   const finish = (r: PlugVerify, redactor: Redactor): StatusResult => {
@@ -247,7 +270,8 @@ export function connect<C, E, S, I, CB, SI, RI>(
             }
           }
         }
-        return Object.freeze({ ...r, paid: r.status === 'paid', checked: { amount: amountChecked, orderId: orderChecked } });
+        const callbackChecked = checkCallback(input);
+        return Object.freeze({ ...r, paid: r.status === 'paid', checked: { amount: amountChecked, orderId: orderChecked, callback: callbackChecked } });
       }),
 
     parseCallback: input =>
