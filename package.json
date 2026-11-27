@@ -1,6 +1,6 @@
 {
   "name": "neppayments",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Khalti and eSewa payment gateway integration for Node.js and TypeScript (Nepal). One API to create, verify and check payments, with amount checks and errors that never leak your secret key.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

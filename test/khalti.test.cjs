@@ -111,7 +111,7 @@ for (const [raw, http, expected] of lookups) {
       assert.equal(res.status, expected);
       assert.equal(res.raw_status, raw);
       assert.equal(res.amount, 1000);
-      assert.equal(res.transaction_id, body.transaction_id);
+      assert.equal(res.transaction_id, body.transaction_id ?? '');
       assert.deepEqual(res.payment_details, body);
     } finally {
       await fake.close();
@@ -157,4 +157,88 @@ test('environment must be sandbox or production', () => {
   });
   assert.doesNotThrow(() => new NepPayments({ khalti: { secretKey: SECRET, environment: 'production' } }));
   assert.doesNotThrow(() => new NepPayments({ khalti: { secretKey: SECRET } }));
+});
+
+test('bad createPayment input throws a validation code and sends nothing', async () => {
+  const fake = await startFake({ 'POST /epayment/initiate/': () => ({ status: 200, body: {} }) });
+  try {
+    const gw = gateway(fake.base);
+    const cases = [
+      [{ ...order, product_details: {} }, 'INVALID_PAYMENT_OPTIONS'],
+      [{ ...order, product_details: [null] }, 'INVALID_PAYMENT_OPTIONS'],
+      [{ ...order, amount_breakdown: 'x' }, 'INVALID_PAYMENT_OPTIONS'],
+      [{ ...order, amount: undefined }, 'INVALID_AMOUNT'],
+      [null, 'INVALID_PAYMENT_OPTIONS']
+    ];
+    for (const [input, code] of cases) {
+      const err = await caught(gw.createPayment(input));
+      assertNoSecret(err);
+      assert.equal(err.code, code);
+    }
+    assert.equal(fake.calls.length, 0);
+  } finally {
+    await fake.close();
+  }
+});
+
+test('input that 2.0.7 sent still goes to Khalti unchanged', async () => {
+  const fake = await startFake({
+    'POST /epayment/initiate/': () => ({ status: 200, body: { pidx: 'p1', payment_url: 'https://pay.example/p1' } })
+  });
+  try {
+    const gw = gateway(fake.base);
+    await gw.createPayment({ ...order, amount: String(order.amount) });
+    await gw.createPayment({ ...order, amount_breakdown: null, product_details: null });
+    assert.equal(fake.calls.length, 2);
+    assert.equal(JSON.parse(fake.calls[0].body).amount, String(order.amount));
+  } finally {
+    await fake.close();
+  }
+});
+
+test('an error that is not an HTTP error gets the fallback code, not NETWORK_ERROR', () => {
+  const { toPaymentError } = require('../dist/utils/httpError');
+  const err = toPaymentError(new TypeError(`bad ${SECRET}`), 'Failed to create payment', 'PAYMENT_FAILED');
+  assert.equal(err.code, 'PAYMENT_FAILED');
+  assert.equal(err.message, 'Failed to create payment: unexpected TypeError');
+  const net = toPaymentError({ isAxiosError: true, code: 'ECONNREFUSED' }, 'Failed', 'PAYMENT_FAILED');
+  assert.equal(net.code, 'NETWORK_ERROR');
+  const slow = toPaymentError({ request: {}, code: 'ECONNABORTED' }, 'Failed', 'PAYMENT_FAILED');
+  assert.equal(slow.code, 'REQUEST_TIMEOUT');
+});
+
+test('the secret key never shows on the gateway object', () => {
+  const payments = new NepPayments({ khalti: { secretKey: SECRET } });
+  for (const value of [payments.khalti, payments]) {
+    for (const text of [util.inspect(value, { depth: 10, showHidden: true }), JSON.stringify(value), String(value)]) {
+      assert.ok(!text.includes(SECRET), `secret shown in: ${text.slice(0, 200)}`);
+    }
+  }
+});
+
+for (const raw of ['Expired', 'User canceled', 'Pending']) {
+  test(`expectedAmount with "${raw}" and no amount returns the status`, async () => {
+    const body = { pidx: 'P1', status: raw, transaction_id: null };
+    const fake = await startFake({ 'POST /epayment/lookup/': () => ({ status: raw === 'Pending' ? 200 : 400, body }) });
+    try {
+      const res = await gateway(fake.base).verifyPayment({ pidx: 'P1', expectedAmount: 1000 });
+      assert.equal(res.raw_status, raw);
+      assert.equal(res.transaction_id, '');
+    } finally {
+      await fake.close();
+    }
+  });
+}
+
+test('expectedAmount with Completed and no amount throws INVALID_RESPONSE', async () => {
+  const body = { pidx: 'P1', status: 'Completed', transaction_id: 'T1' };
+  const fake = await startFake({ 'POST /epayment/lookup/': () => ({ status: 200, body }) });
+  try {
+    const err = await caught(gateway(fake.base).verifyPayment({ pidx: 'P1', expectedAmount: 1000 }));
+    assertNoSecret(err);
+    assert.equal(err.code, 'INVALID_RESPONSE');
+    assert.match(err.message, /no amount/);
+  } finally {
+    await fake.close();
+  }
 });

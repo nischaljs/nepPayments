@@ -15,6 +15,8 @@ export function toPaymentError(
 
   const err = error as {
     code?: string;
+    isAxiosError?: boolean;
+    request?: unknown;
     response?: { status?: number; data?: unknown };
   } | null;
 
@@ -26,10 +28,19 @@ export function toPaymentError(
     });
   }
 
-  if (err && (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT')) {
-    return new PaymentError(`${fallbackMessage}: the request timed out`, PaymentErrorCode.REQUEST_TIMEOUT);
+  // Only a request that was sent and got no answer is a network problem.
+  // isAxiosError is the flag axios.isAxiosError() reads.
+  if (err && (err.isAxiosError === true || err.request !== undefined)) {
+    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+      return new PaymentError(`${fallbackMessage}: the request timed out`, PaymentErrorCode.REQUEST_TIMEOUT);
+    }
+    return new PaymentError(`${fallbackMessage}: no response from the gateway`, PaymentErrorCode.NETWORK_ERROR);
   }
-  return new PaymentError(`${fallbackMessage}: no response from the gateway`, PaymentErrorCode.NETWORK_ERROR);
+
+  // Anything else is a bug or bad input. Keep only the error's name, so no
+  // outside text ends up in the message.
+  const name = error instanceof Error ? error.name : typeof error;
+  return new PaymentError(`${fallbackMessage}: unexpected ${name}`, fallbackCode);
 }
 
 function codeFor(status: number, data: unknown, fallback: PaymentErrorCode): PaymentErrorCode {

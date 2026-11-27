@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.0.8 (2026-11-27)
+
+Fixes from the 2.0.7 review. The public API is the same.
+
+### Changed
+
+- eSewa `AMBIGUOUS` now maps to `PENDING` (was `FAILED`). The payment is not
+  settled yet, so do not ask the buyer to pay again. `raw_status` still says
+  `AMBIGUOUS`.
+- `expectedAmount` is checked only when the status is `COMPLETED`. An expired,
+  canceled or pending payment returns its status with no amount check.
+
+### Fixed
+
+- Bad input no longer comes back as `NETWORK_ERROR`. `createPayment` checks its
+  input before any request: eSewa without `signed_field_names` and Khalti with
+  a `product_details` or `amount_breakdown` that is not an array throw
+  `INVALID_PAYMENT_OPTIONS`; a Khalti amount that is not a number throws
+  `INVALID_AMOUNT`. A numeric string amount and a `null` `amount_breakdown` or
+  `product_details` still work, as in 2.0.7.
+- Only an HTTP client error with no response (no answer, a timeout, a bad URL
+  or a cancelled request) gives `NETWORK_ERROR` or `REQUEST_TIMEOUT`. Any other error gets the method's own code
+  (`PAYMENT_FAILED` or `VERIFICATION_FAILED`).
+- The secret key is no longer a property of the gateway object, so
+  `console.log(gateway)` and `JSON.stringify(gateway)` do not show it. The
+  `config` field is gone at runtime too (it was already private in the types).
+- Khalti `transaction_id` is `''` when Khalti sends `null`, as with eSewa.
+- A completed payment with no amount in the gateway's answer and
+  `expectedAmount` set throws `INVALID_RESPONSE` with a clear message (was
+  `AMOUNT_MISMATCH` against `NaN`).
+
 ## 2.0.7 (2026-11-27)
 
 Security fix. Upgrade from any 2.x version. The public API is the same.
