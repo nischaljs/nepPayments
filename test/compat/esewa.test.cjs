@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const util = require('node:util');
 const { startFake } = require('./fakeServer.cjs');
-const { NepPayments, PaymentError } = require('../dist');
+const { NepPayments, PaymentError } = require('../../dist/compat');
 
 // eSewa's published UAT credentials.
 const PRODUCT = 'EPAYTEST';
