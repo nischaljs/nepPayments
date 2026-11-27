@@ -83,6 +83,8 @@ export enum PaymentErrorCode {
 
 /**
  * Custom error class for payment-related errors
+ * @example
+ * if (err instanceof PaymentError && err.code === PaymentErrorCode.AMOUNT_MISMATCH) { ... }
  */
 export class PaymentError extends Error {
   /**

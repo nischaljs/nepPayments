@@ -1,4 +1,4 @@
-import { NormalizedPaymentStatus } from './payment.enums';
+import { NormalizedPaymentStatus } from './enums';
 
 /**
  * Amount breakdown item for Khalti payment

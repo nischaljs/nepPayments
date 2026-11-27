@@ -1,84 +1,70 @@
-// index.ts
-import { KhaltiGateway } from './gateways/khalti';
-import { EsewaGateway } from './gateways/esewa';
-import { PaymentError, PaymentErrorCode } from './types/payment.enums';
-import { KhaltiConfig, EsewaConfig } from './types/payment.types';
+import { PaymentError, type CommonOptions, type GatewayName, type Mode } from './core';
+import { createConnectIps, type ConnectIpsClient, type ConnectIpsConfig } from './gateways/connectips';
+import { createEsewa, type EsewaClient, type EsewaConfig } from './gateways/esewa';
+import { createHamroPay, type HamroPayClient, type HamroPayConfig } from './gateways/hamropay';
+import { createKhalti, type KhaltiClient, type KhaltiConfig } from './gateways/khalti';
 
-/**
- * Main class for handling Nepali payment gateways
- */
-export class NepPayments {
-  public readonly khalti?: KhaltiGateway;
-  public readonly esewa?: EsewaGateway;
+export * from './core/public';
+export * from './gateways/khalti';
+export * from './gateways/esewa';
+export * from './gateways/connectips';
+export * from './gateways/hamropay';
 
-  /**
-   * Create a new NepPayments instance
-   * @param config Configuration for payment gateways
-   */
-  constructor(config: {
-    khalti?: KhaltiConfig;
-    esewa?: EsewaConfig;
-  }) {
-    if (config.khalti) {
-      this.khalti = new KhaltiGateway(config.khalti);
-    }
-    if (config.esewa) {
-      this.esewa = new EsewaGateway(config.esewa);
-    }
-
-    // Check if at least one gateway is configured
-    if (!this.khalti && !this.esewa) {
-      throw new PaymentError(
-        'At least one payment gateway must be configured',
-        PaymentErrorCode.GATEWAY_NOT_CONFIGURED
-      );
-    }
-  }
-
-  /**
-   * Get the configured Khalti gateway
-   * @throws {PaymentError} If Khalti is not configured
-   */
-  get khaltiGateway(): KhaltiGateway {
-    if (!this.khalti) {
-      throw new PaymentError(
-        'Khalti gateway is not configured',
-        PaymentErrorCode.GATEWAY_NOT_CONFIGURED
-      );
-    }
-    return this.khalti;
-  }
-
-  /**
-   * Get the configured eSewa gateway
-   * @throws {PaymentError} If eSewa is not configured
-   */
-  get esewaGateway(): EsewaGateway {
-    if (!this.esewa) {
-      throw new PaymentError(
-        'eSewa gateway is not configured',
-        PaymentErrorCode.GATEWAY_NOT_CONFIGURED
-      );
-    }
-    return this.esewa;
-  }
-
-  /**
-   * Get list of configured gateways
-   */
-  get configuredGateways(): string[] {
-    const gateways: string[] = [];
-    if (this.khalti) gateways.push('khalti');
-    if (this.esewa) gateways.push('esewa');
-    return gateways;
-  }
+interface Configs {
+  khalti: KhaltiConfig;
+  esewa: EsewaConfig;
+  connectips: ConnectIpsConfig;
+  hamropay: HamroPayConfig;
 }
 
-// Export types
-export * from './types/payment.types';
-export * from './types/payment.enums';
-export { PaymentError } from './types/payment.enums';
+interface Clients {
+  khalti: KhaltiClient;
+  esewa: EsewaClient;
+  connectips: ConnectIpsClient;
+  hamropay: HamroPayClient;
+}
 
-// Export individual gateways for direct use if needed
-export { KhaltiGateway } from './gateways/khalti';
-export { EsewaGateway } from './gateways/esewa';
+/** Options for `createPayments`. Set `mode` once at the top, or per gateway. */
+export type PaymentsOptions = {
+  /** Default mode for every gateway below. */
+  mode?: Mode;
+  timeoutMs?: number;
+  fetch?: typeof fetch;
+} & { [K in GatewayName]?: Configs[K] & { mode?: Mode; timeoutMs?: number } };
+
+/** The result of `createPayments`: only the gateways you configured. */
+export type Payments<O extends PaymentsOptions> = {
+  readonly [K in GatewayName as O[K] extends object ? K : never]: Clients[K];
+};
+
+const MAKERS = { khalti: createKhalti, esewa: createEsewa, connectips: createConnectIps, hamropay: createHamroPay } as const;
+
+/**
+ * Create clients for the gateways you use. Only the gateways in `options` exist
+ * on the result, and TypeScript knows which.
+ *
+ * @example
+ * import { createPayments, paisa } from 'nepal-payments';
+ * const payments = createPayments({ mode: 'sandbox', khalti: { secretKey: process.env.KHALTI_SECRET_KEY! } });
+ * const start = await payments.khalti.initiate({ amount: paisa(1000), orderId: 'o-1', orderName: 'Tea',
+ *   returnUrl: 'https://shop.example/paid', websiteUrl: 'https://shop.example' });
+ * // later, on your server:
+ * const result = await payments.khalti.verify({ ref: start.ref, expectedAmount: paisa(1000), expectedOrderId: 'o-1' });
+ * if (result.paid) shipOrder();
+ */
+export function createPayments<const O extends PaymentsOptions>(options: O): Payments<O> {
+  if (!options || typeof options !== 'object') {
+    throw new PaymentError({ code: 'INVALID_CONFIG', message: 'createPayments needs an options object, such as { mode: "sandbox", khalti: { secretKey } }.' });
+  }
+  const out: Record<string, unknown> = {};
+  for (const name of Object.keys(MAKERS) as GatewayName[]) {
+    const cfg = options[name];
+    if (cfg === undefined) continue;
+    const merged = { timeoutMs: options.timeoutMs, fetch: options.fetch, ...cfg, mode: cfg?.mode ?? options.mode } as Configs[typeof name] & CommonOptions;
+    out[name] = (MAKERS[name] as (c: typeof merged) => unknown)(merged);
+  }
+  if (Object.keys(out).length === 0) {
+    throw new PaymentError({ code: 'INVALID_CONFIG', message: 'createPayments needs at least one gateway: khalti, esewa, connectips or hamropay.' });
+  }
+  return Object.freeze(out) as Payments<O>;
+}
