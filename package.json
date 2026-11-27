@@ -1,7 +1,7 @@
 {
   "name": "neppayments",
   "version": "2.0.7",
-  "description": "A simple and easy-to-use package for integrating Nepali payment gateways (Khalti and eSewa) into your applications",
+  "description": "Khalti and eSewa payment gateway integration for Node.js and TypeScript (Nepal). One API to create, verify and check payments, with amount checks and errors that never leak your secret key.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -13,11 +13,24 @@
   },
   "keywords": [
     "nepal",
+    "nepali",
     "payment",
+    "payment-gateway",
     "khalti",
+    "khalti-payment",
+    "khalti-integration",
     "esewa",
-    "gateway",
-    "typescript"
+    "esewa-payment",
+    "esewa-integration",
+    "esewa-v2",
+    "epay",
+    "nodejs",
+    "typescript",
+    "express",
+    "nextjs",
+    "nestjs",
+    "npr",
+    "fintech"
   ],
   "author": "Nischal Bhattarai",
   "license": "MIT",
