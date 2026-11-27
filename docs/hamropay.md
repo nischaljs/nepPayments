@@ -35,6 +35,19 @@ const start = await payments.hamropay.initiate({
 
 Optional: `remarks` (250 characters or fewer, default the orderId), `phone`, `products` (prices in paisa; sent to Hamro Pay in rupees), `metadata`.
 
+## Amount units
+
+You always pass paisa. Hamro Pay uses a different unit per field, and the plug converts each one. From the [Hamro Pay API reference](https://hamropay.com.np/checkout/developer-reference/):
+
+| Field | Hamro Pay unit | Doc text |
+|---|---|---|
+| create session `transactionAmount` (also signed in the header and the form token) | paisa | "Long. Amount in Paisa. ... Rs.10 = 1000, Rs.89.92 = 8992" |
+| `productList[].price` | rupees | "Amount in Rs. for render purpose so Rs.99.99 should be 99.99" |
+| transaction status `amount` | rupees | "Double. Amount in Rupees." |
+| webhook `amount` | rupees | "double. Transaction amount in Rs." |
+
+The doc's create session sample sends `"transactionAmount": "1000"` with products priced 10 and 20, so the sample does not add up. The plug follows the field table, not the sample's product prices.
+
 ## Callback, webhook and verify
 
 ```ts

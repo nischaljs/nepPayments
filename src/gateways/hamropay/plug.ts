@@ -117,7 +117,8 @@ async function transaction(ctx: Ctx, ref: string): Promise<PlugVerify> {
   const status = hamroPayStatus(rawStatus);
   const echo = typeof d!.merchantTxnId === 'string' ? d!.merchantTxnId : typeof d!.merchantTransactionId === 'string' ? d!.merchantTransactionId : null;
   let amount: Paisa | null = null;
-  // The amount is rupees, and 0 until the payment finishes.
+  // Units differ by field. The Hamro Pay API reference (hamropay.com.np/checkout/developer-reference) says:
+  // transaction status `amount` is "Double | Amount in Rupees." It is 0 until the payment finishes.
   if (status === 'paid') {
     amount = tryRupees(d!.amount);
     if (amount === null) ctx.fail({ code: 'INVALID_RESPONSE', message: 'Hamro Pay sent an amount this library could not read.', response: { status: res.status, data: res.data } });
@@ -174,7 +175,10 @@ export const hamroPayPlug: Plug<HamroPayConfig, HamroPayEndpoints, undefined, Ha
     const remarks = i.remarks ?? i.orderId;
     if (remarks.length > 250) ctx.fail({ code: 'INVALID_INPUT', field: 'remarks', message: 'Hamro Pay remarks may be at most 250 characters.' });
     const c = ctx.config;
+    // Hamro Pay API reference, create session: `transactionAmount` is "Long | Amount in Paisa ... Rs.10 = 1000".
+    // Its sample sends it as the string "1000". The same text is signed in the header and the form token.
     const amount = String(i.amount);
+    // Same page: productList `price` is "Amount in Rs. for render purpose so Rs.99.99 should be 99.99".
     const products = (i.products ?? [{ name: remarks, price: i.amount, quantity: 1 }]).map(p => ({
       name: p.name,
       description: p.description ?? p.name,
@@ -236,6 +240,7 @@ export const hamroPayPlug: Plug<HamroPayConfig, HamroPayEndpoints, undefined, Ha
       if (!ok) ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook signature does not match. Do not trust this webhook.' });
       if (body.merchantId !== ctx.config.merchantId) ctx.fail({ code: 'INVALID_SIGNATURE', message: 'The Hamro Pay webhook is for another merchant.' });
       const mapped = hamroPayStatus(status);
+      // Same page, webhook body: `amount` is "double | Transaction amount in Rs.".
       return { ref: id, orderId: id, status: mapped, amount: mapped === 'paid' ? tryRupees(amountNumber) : null, transactionId: null, signed: true, rawStatus: status, raw: body };
     }
     let q: Record<string, string>;
