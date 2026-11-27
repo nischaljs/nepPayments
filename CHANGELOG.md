@@ -10,9 +10,9 @@ New package name: `nepal-payments` (was `nep-payments`). Release candidate.
 - ConnectIPS (RSA-signed form from a .pfx or PEM key, `validatetxn`) and Hamro Pay (session, signed form, signed webhook, transaction status).
 - One shape for every gateway: `initiate` returns `redirect` or `form`; `parseCallback`; `verify({ ref, expectedAmount, expectedOrderId })`; `status` (no checks and no `paid` field, so it is not for fulfilment); `refund` (Khalti).
 - Statuses `paid`, `pending`, `failed`, `canceled`, `refunded`, `expired`, `ambiguous`. eSewa AMBIGUOUS and Khalti Refunded keep their own status.
-- `verify` checks the amount and, where the gateway reports it, the order id.
+- `verify` checks the amount and, where the gateway reports it, the order id. It also takes an optional `callback` (what `parseCallback` returned); when that callback is signed, its amount and order id are compared too. `result.checked` is `{ amount, orderId, callback }`. Pass the callback for eSewa, whose status API only echoes the amount you send.
 - Amounts are integer paisa everywhere (`paisa`, `rupees`, `toRupeeString`).
-- `mode: 'mock'`: no keys, no network. Mock mode is refused when `NODE_ENV` is `production` (INVALID_CONFIG). Mock refs are signed with a key made per process, so a typed ref fails, and a ref works only in the process that made it (not after a restart or on another instance).
+- `mode: 'mock'`: no keys, no network. Mock mode is refused when `NODE_ENV` is `production` (INVALID_CONFIG). Mock refs are signed with a key made per process, so a typed ref fails, and a ref works only in the process that made it (not after a restart or on another instance). A mock ref has 6 parts: `mock.<outcome>.<amount>.<orderId base64url>.<random>.<hmac>`.
 - `nepal-payments/testing`: `fakeFetch` and fake handlers for each gateway, `esewaCallback`, `hamroPayWebhook`.
 - Subpath entries `nepal-payments/khalti`, `/esewa`, `/connectips`, `/hamropay`. ESM and CommonJS, with types.
 - `AGENTS.md`, `llms.txt`, an agent skill, and docs per gateway with Express, Next.js and NestJS recipes.
