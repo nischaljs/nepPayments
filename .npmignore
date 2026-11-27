@@ -1,8 +1,0 @@
-/src
-/eslint.config.mjs
-/jest.config.cjs
-/add-shebang.mjs
-/*.mjs
-/*.cjs
-/docs
-test-payment.ts

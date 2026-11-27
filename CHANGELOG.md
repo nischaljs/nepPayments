@@ -1,5 +1,43 @@
 # Changelog
 
+## 3.0.0-rc.2 (2026-11-27)
+
+- Security: in `nepal-payments/compat`, the secret key no longer shows in `JSON.stringify(gateway)` or a deep `util.inspect`. In rc.1 a copy sat in the HTTP client. Upgrade from rc.1.
+- `nepal-payments/compat` now matches 2.0.8: eSewa AMBIGUOUS is `PENDING`, `expectedAmount` is checked only on `COMPLETED`, bad `createPayment` input throws its validation code before any request, `NETWORK_ERROR` and `REQUEST_TIMEOUT` only when a request went out and no answer came (anything else gets the method's code), the secret key and the HTTP client are private fields (not in `JSON.stringify(gateway)`), Khalti `transaction_id` is `''` when null, and a completed payment with no amount throws `INVALID_RESPONSE`.
+- One difference from 2.0.8 in compat, on purpose: a Khalti lookup answered with HTTP 200 and no payment object (empty, `null`, HTML or a list) throws `INVALID_RESPONSE`. 2.0.8 returned `FAILED` with an empty `transaction_id`, or threw a `TypeError` on `null`.
+
+## 3.0.0-rc.1 (2026-11-27)
+
+- A full README: quick start per gateway, safe defaults, mock mode and tests, migrating from `neppayments` 2.x, and notes for coding agents. With a demo GIF and an architecture picture (not in the package).
+- The package description and keywords say what the package does.
+- ConnectIPS and Hamro Pay are no longer marked experimental.
+
+## 3.0.0-rc.0 (2026-11-27)
+
+New package name: `nepal-payments` (was `neppayments`). Release candidate.
+
+### Added
+
+- `createPayments({ mode, khalti?, esewa?, connectips?, hamropay? })`. Only the gateways you configure exist on the result, and TypeScript knows which.
+- ConnectIPS (RSA-signed form from a .pfx or PEM key, `validatetxn`) and Hamro Pay (session, signed form, signed webhook, transaction status).
+- One shape for every gateway: `initiate` returns `redirect` or `form`; `parseCallback`; `verify({ ref, expectedAmount, expectedOrderId })`; `status` (no checks and no `paid` field, so it is not for fulfilment); `refund` (Khalti).
+- Statuses `paid`, `pending`, `failed`, `canceled`, `refunded`, `expired`, `ambiguous`. eSewa AMBIGUOUS and Khalti Refunded keep their own status.
+- `verify` checks the amount and, where the gateway reports it, the order id. It also takes an optional `callback` (what `parseCallback` returned); when that callback is signed, its amount and order id are compared too. `result.checked` is `{ amount, orderId, callback }`. Pass the callback for eSewa, whose status API only echoes the amount you send. Only the exact object `parseCallback` returned counts as signed: a copy that says `signed: true` throws `INVALID_INPUT`, so run `parseCallback` again on a stored raw callback.
+- Amounts are integer paisa everywhere (`paisa`, `rupees`, `toRupeeString`).
+- `mode: 'mock'`: no keys, no network. Mock mode is refused when `NODE_ENV` is `production` (INVALID_CONFIG). Mock refs are signed with a key made per process, so a typed ref fails, and a ref works only in the process that made it (not after a restart or on another instance). A mock ref has 6 parts: `mock.<outcome>.<amount>.<orderId base64url>.<random>.<hmac>`.
+- `nepal-payments/testing`: `fakeFetch` and fake handlers for each gateway, `esewaCallback`, `hamroPayWebhook`.
+- Subpath entries `nepal-payments/khalti`, `/esewa`, `/connectips`, `/hamropay`. ESM and CommonJS, with types.
+- `AGENTS.md`, `llms.txt`, an agent skill, and docs per gateway with Express, Next.js and NestJS recipes.
+
+### Changed
+
+- No runtime dependencies. HTTP uses the built-in `fetch` (Node 18 or later), with a timeout on every call.
+- `PaymentError` has `code`, `message`, `gateway`, `field` and `response: { status, data }`, with every secret removed.
+
+### Upgrading
+
+- `import { NepPayments } from 'nepal-payments/compat'` keeps the 2.x API and outputs, including 2.x status names.
+
 ## 2.0.8 (2026-11-27)
 
 Fixes from the 2.0.7 review. The public API is the same.

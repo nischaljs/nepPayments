@@ -1,71 +1,176 @@
 {
-  "name": "neppayments",
-  "version": "2.0.8",
-  "description": "Khalti and eSewa payment gateway integration for Node.js and TypeScript (Nepal). One API to create, verify and check payments, with amount checks and errors that never leak your secret key.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "test": "npm run build && node --test test/*.test.cjs",
-    "lint": "eslint src --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "prepare": "npm run build"
-  },
+  "name": "nepal-payments",
+  "version": "3.0.0-rc.2",
+  "description": "Khalti, eSewa, ConnectIPS and Hamro Pay payments for Node.js and TypeScript. One API to start and verify payments from Nepal's gateways, with amount checks built in. Zero runtime dependencies. Built for coding agents too.",
   "keywords": [
     "nepal",
-    "nepali",
     "payment",
     "payment-gateway",
     "khalti",
-    "khalti-payment",
-    "khalti-integration",
     "esewa",
-    "esewa-payment",
-    "esewa-integration",
-    "esewa-v2",
-    "epay",
-    "nodejs",
-    "typescript",
-    "express",
-    "nextjs",
-    "nestjs",
+    "connectips",
+    "connect-ips",
+    "hamropay",
+    "nepal-payment",
     "npr",
-    "fintech"
+    "epay",
+    "checkout",
+    "typescript",
+    "nodejs",
+    "nextjs",
+    "express",
+    "nestjs",
+    "sdk",
+    "khalti-sdk",
+    "esewa-sdk",
+    "payments",
+    "nepali",
+    "nepal-payment-gateway",
+    "hamro-pay",
+    "nchl",
+    "esewa-payment",
+    "khalti-payment",
+    "zero-dependency",
+    "ai-agents",
+    "llms-txt"
   ],
   "author": "Nischal Bhattarai",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nischaljs/nepPayments.git"
+    "url": "git+https://github.com/nischaljs/nepal-payments.git"
   },
-  "homepage": "https://github.com/nischaljs/nepPayments#readme",
+  "homepage": "https://github.com/nischaljs/nepal-payments#readme",
   "bugs": {
-    "url": "https://github.com/nischaljs/nepPayments/issues"
+    "url": "https://github.com/nischaljs/nepal-payments/issues"
   },
-  "dependencies": {
-    "axios": "^1.10.0",
-    "crypto-js": "^4.2.0"
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./khalti": {
+      "import": {
+        "types": "./dist/khalti.d.mts",
+        "default": "./dist/khalti.mjs"
+      },
+      "require": {
+        "types": "./dist/khalti.d.ts",
+        "default": "./dist/khalti.js"
+      }
+    },
+    "./esewa": {
+      "import": {
+        "types": "./dist/esewa.d.mts",
+        "default": "./dist/esewa.mjs"
+      },
+      "require": {
+        "types": "./dist/esewa.d.ts",
+        "default": "./dist/esewa.js"
+      }
+    },
+    "./connectips": {
+      "import": {
+        "types": "./dist/connectips.d.mts",
+        "default": "./dist/connectips.mjs"
+      },
+      "require": {
+        "types": "./dist/connectips.d.ts",
+        "default": "./dist/connectips.js"
+      }
+    },
+    "./hamropay": {
+      "import": {
+        "types": "./dist/hamropay.d.mts",
+        "default": "./dist/hamropay.mjs"
+      },
+      "require": {
+        "types": "./dist/hamropay.d.ts",
+        "default": "./dist/hamropay.js"
+      }
+    },
+    "./compat": {
+      "import": {
+        "types": "./dist/compat.d.mts",
+        "default": "./dist/compat.mjs"
+      },
+      "require": {
+        "types": "./dist/compat.d.ts",
+        "default": "./dist/compat.js"
+      }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.mts",
+        "default": "./dist/testing.mjs"
+      },
+      "require": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      }
+    },
+    "./package.json": "./package.json"
   },
-  "devDependencies": {
-    "@types/axios": "^0.9.36",
-    "@types/jest": "^29.5.12",
-    "@types/node": "^20.19.1",
-    "@typescript-eslint/eslint-plugin": "^7.0.1",
-    "@typescript-eslint/parser": "^7.0.1",
-    "eslint": "^8.56.0",
-    "jest": "^29.7.0",
-    "prettier": "^3.2.5",
-    "ts-jest": "^29.1.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+  "typesVersions": {
+    "*": {
+      "khalti": [
+        "./dist/khalti.d.ts"
+      ],
+      "esewa": [
+        "./dist/esewa.d.ts"
+      ],
+      "connectips": [
+        "./dist/connectips.d.ts"
+      ],
+      "hamropay": [
+        "./dist/hamropay.d.ts"
+      ],
+      "compat": [
+        "./dist/compat.d.ts"
+      ],
+      "testing": [
+        "./dist/testing.d.ts"
+      ]
+    }
   },
+  "sideEffects": false,
   "files": [
     "dist",
+    "docs",
+    "!docs/media",
+    "skills",
+    "AGENTS.md",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "llms.txt"
   ],
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "depcheck": "depcruise src --config .dependency-cruiser.cjs",
+    "test": "npm run build && node --test test/*.test.cjs test/compat/*.test.cjs",
+    "test:pack": "npm run build && node --test test/pack/*.test.cjs",
+    "check": "npm run typecheck && npm run depcheck && npm test && npm run test:pack",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.1",
+    "dependency-cruiser": "^16.10.4",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
   }
 }

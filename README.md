@@ -1,155 +1,333 @@
-# neppayments: Khalti and eSewa payment integration for Node.js
+<!-- Images and doc links are absolute (raw.githubusercontent.com and github.com) and pinned to the release tag, so they also work on npm. Change the tag with each release. -->
 
-[![npm version](https://img.shields.io/npm/v/neppayments)](https://www.npmjs.com/package/neppayments)
-[![npm downloads](https://img.shields.io/npm/dm/neppayments)](https://www.npmjs.com/package/neppayments)
-[![license: MIT](https://img.shields.io/npm/l/neppayments)](LICENSE)
-[![types: TypeScript](https://img.shields.io/badge/types-TypeScript-informational)](https://www.npmjs.com/package/neppayments)
+# nepal-payments
 
-Accept payments in Nepal with **Khalti** and **eSewa** from one Node.js or TypeScript API. Create a payment, send the customer to the gateway, then verify it on your server. Works with Express, Next.js, NestJS and any Node.js backend.
+Khalti, eSewa, ConnectIPS and Hamro Pay for Node.js and TypeScript. One API, zero runtime dependencies, built for coding agents too.
 
-- **One API for both gateways:** `createPayment` and `verifyPayment` work the same way for Khalti and eSewa.
-- **Amount check:** pass `expectedAmount` and a payment for the wrong amount throws `AMOUNT_MISMATCH`.
-- **Safe to log:** errors and gateway objects never carry request headers or your secret key.
-- **Sandbox and production:** switch with one `environment` setting. Test credentials are below.
+[![npm version](https://img.shields.io/npm/v/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
+[![npm downloads](https://img.shields.io/npm/dm/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
+[![license: MIT](https://img.shields.io/npm/l/nepal-payments)](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/LICENSE)
+[![types: included](https://img.shields.io/npm/types/nepal-payments)](https://www.npmjs.com/package/nepal-payments)
+[![dependencies: 0](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/package.json)
 
-> **Upgrade to 2.0.7 now** (`npm install neppayments@latest`). In 2.0.6 and earlier, a failed Khalti call threw the raw HTTP error, which held your Khalti secret key in its headers. If your app logged errors, check your logs and roll your Khalti key. 2.0.7 is a drop-in update, no code change needed. See the [changelog](CHANGELOG.md).
+![A terminal in mock mode: npm install nepal-payments, a short script that starts a Khalti payment and verifies it, then the run. The first verify says paid = true. The second verify, with a different expected amount, stops with AMOUNT_MISMATCH.](https://raw.githubusercontent.com/nischaljs/nepal-payments/v3.0.0-rc.2/docs/media/demo.gif)
 
-## Installation
+> **3.0.0-rc.1, a release candidate.** Khalti, eSewa, ConnectIPS and Hamro Pay are all ready to use.
+
+## Why
+
+Every Nepali shop that takes money online writes the same code: start a payment, send the buyer away, check the payment when they come back. The check is the part that goes wrong. A buyer can come back with a cheaper payment's id, or a callback that was never signed.
+
+- **One shape for every gateway.** `initiate`, `parseCallback`, `verify`. Learn it once.
+- **The checks are built in.** `verify` compares the amount and the order with your own records, and throws when they differ.
+- **Small and plain.** No runtime dependencies. It uses the `fetch` that comes with Node 18.
+- **Typed.** Only the gateways you configure exist on `payments`, and TypeScript knows which.
+- **Test without keys.** Mock mode, and fake gateways for your tests.
+
+## Install
+
+You need Node.js 18 or newer. This package runs on your server only. Never import it in browser code.
 
 ```bash
-npm install neppayments
+npm install nepal-payments
 ```
 
-## Usage
+ESM and CommonJS both work, with types.
 
-### 1. Initialize the Payment Gateway
+## How it works
+
+The same three steps for every gateway:
+
+1. **Start.** `initiate()` on your server. Store `start.ref` with the order. Then send the buyer on: a redirect (Khalti) or a form that posts itself (eSewa, ConnectIPS, Hamro Pay).
+2. **Come back.** The buyer returns to your URL. `parseCallback()` reads it. Use it to find the order, nothing more.
+3. **Verify.** `verify({ ref, expectedAmount, expectedOrderId })` on your server, with values from your own database. Ship only when `result.paid` is `true`.
+
+Amounts are whole paisa everywhere. `rupees(100)` is `10000` paisa. `paisa(10000)` is the same amount.
+
+## Quick start
+
+### Khalti
 
 ```ts
+import { createPayments, rupees } from 'nepal-payments';
+
+const payments = createPayments({
+  mode: 'sandbox', // 'live' for real money; for local runs with no keys, see Mock mode below
+  khalti: { secretKey: process.env.KHALTI_SECRET_KEY! }
+});
+
+// 1. Start. Keep start.ref (the pidx) with the order.
+const start = await payments.khalti.initiate({
+  amount: rupees(100),
+  orderId: 'order-42',
+  orderName: 'Two cups of tea',
+  returnUrl: 'https://shop.example/pay/khalti/return',
+  websiteUrl: 'https://shop.example'
+});
+await saveOrderRef('order-42', start.ref); // your database
+// redirect the buyer to start.url
+
+// 2. On the return URL. The pidx in the URL only finds the order.
+const cb = await payments.khalti.parseCallback(returnUrl);
+const order = await findOrderByRef(cb.ref); // your database
+
+// 3. Verify the pidx you stored, not the one in the URL.
+const result = await payments.khalti.verify({ ref: order.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+if (result.paid) {
+  // ship the order
+}
+```
+
+Refunds: `payments.khalti.refund({ transactionId, amount? })`. Leave out `amount` for a full refund. Full guide: [docs/khalti.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/khalti.md).
+
+### eSewa
+
+```ts
+const payments = createPayments({
+  mode: 'sandbox',
+  esewa: { productCode: process.env.ESEWA_PRODUCT_CODE!, secretKey: process.env.ESEWA_SECRET_KEY! }
+});
+
+// 1. Start. eSewa takes a signed form.
+const start = await payments.esewa.initiate({
+  amount: rupees(100),
+  orderId: 'order-42', // letters, digits and hyphens
+  successUrl: 'https://shop.example/pay/esewa/success',
+  failureUrl: 'https://shop.example/pay/esewa/failure'
+});
+// render <form method="POST" action={start.action}> with one hidden input per start.fields, and submit it
+
+// 2. On the success URL. The signature is checked here; a forged one throws INVALID_SIGNATURE.
+const cb = await payments.esewa.parseCallback(successUrl);
+const order = await findOrder(cb.ref);
+
+// 3. Verify, and pass the signed callback too.
+const result = await payments.esewa.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: order.id, callback: cb });
+if (result.paid) {
+  // ship the order
+}
+```
+
+Pass `callback: cb`. The eSewa status API only repeats the amount you ask with, so the signed callback's amount is the real check. eSewa has no refund API. Full guide: [docs/esewa.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/esewa.md).
+
+### ConnectIPS
+
+```ts
+import fs from 'node:fs';
+
+const payments = createPayments({
+  mode: 'sandbox',
+  connectips: {
+    merchantId: Number(process.env.CIPS_MERCHANT_ID),
+    appId: process.env.CIPS_APP_ID!,
+    appName: process.env.CIPS_APP_NAME!,
+    password: process.env.CIPS_PASSWORD!,
+    pfx: fs.readFileSync(process.env.CIPS_PFX_PATH!), // or privateKeyPem
+    pfxPassword: process.env.CIPS_PFX_PASSWORD!
+  }
+});
+
+// A new orderId for every attempt, also when the buyer tries the same order again.
+const start = await payments.connectips.initiate({ amount: rupees(500), orderId: 'order-42-a1' });
+// post start.fields to start.action
+
+const cb = await payments.connectips.parseCallback(returnUrl);
+const result = await payments.connectips.verify({ ref: cb.ref, expectedAmount: order.amount, expectedOrderId: 'order-42-a1' });
+```
+
+The form is signed with your RSA key from the `.pfx` NCHL gives you. Its amount check is an echo for now: compare with your connectIPS merchant report when it matters. Full guide: [docs/connectips.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/connectips.md).
+
+### Hamro Pay
+
+```ts
+const payments = createPayments({
+  mode: 'sandbox',
+  hamropay: {
+    merchantId: process.env.HAMROPAY_MERCHANT_ID!,
+    clientId: process.env.HAMROPAY_CLIENT_ID!,
+    clientApiKey: process.env.HAMROPAY_CLIENT_API_KEY!,
+    clientSecret: process.env.HAMROPAY_CLIENT_SECRET!,
+    webhookSecret: process.env.HAMROPAY_WEBHOOK_SECRET // only to read webhooks
+  }
+});
+
+const start = await payments.hamropay.initiate({
+  amount: rupees(100),
+  orderId: 'order-42', // at most 25 characters
+  successUrl: 'https://shop.example/pay/hamropay/success',
+  failureUrl: 'https://shop.example/pay/hamropay/failure'
+});
+// post start.fields to start.action within 10 minutes (start.expiresAt)
+
+// The webhook is signed. Pass the raw body text and the signature header.
+const hook = await payments.hamropay.parseCallback({ body: rawBody, signature: signatureHeader });
+const result = await payments.hamropay.verify({ ref: hook.ref, expectedAmount: order.amount, expectedOrderId: order.id, callback: hook });
+```
+
+Hamro Pay does not publish its live hosts, so `mode: 'live'` needs `endpoints: { api, gateway }` from Hamro Pay. Full guide: [docs/hamropay.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/hamropay.md).
+
+### One gateway only
+
+Each gateway has its own entry, if you want only one:
+
+```ts
+import { createKhalti, rupees } from 'nepal-payments/khalti';
+
+const khalti = createKhalti({ mode: 'sandbox', secretKey: process.env.KHALTI_SECRET_KEY! });
+```
+
+Also `nepal-payments/esewa` (`createEsewa`), `/connectips` (`createConnectIps`) and `/hamropay` (`createHamroPay`).
+
+## Safe by default
+
+The library does the checks that are easy to forget.
+
+- **Amounts are checked.** `verify` compares the gateway's amount with `expectedAmount` and throws `AMOUNT_MISMATCH` when they differ. It compares the order id too, where the gateway reports one, and throws `ORDER_MISMATCH`. A "paid" answer with no amount throws `INVALID_RESPONSE`, so it never passes as paid.
+- **Khalti: verify the pidx you stored.** Khalti's lookup has no order id, so the only link between a payment and your order is the pidx you saved at `initiate`. Never verify the pidx from the return URL: a buyer can put a cheaper payment's pidx there. `result.checked.orderId` is `false` for Khalti in sandbox and live, so you can see this.
+- **eSewa: the callback is signed, and checked.** `parseCallback` checks eSewa's HMAC signature and throws `INVALID_SIGNATURE` on a bad one. Pass the result to `verify` as `callback`, and its signed amount and order id are compared too. Only the exact object `parseCallback` returned counts: a stored or copied one that says `signed: true` throws `INVALID_INPUT`. The Hamro Pay webhook works the same way.
+- **Errors never carry secrets.** Every error is a `PaymentError` with `code`, `message`, `gateway`, `field` and `response: { status, data }`. It never holds the request, the headers or your config, so you can log it and send it to an error tracker. Secrets are also removed from every result's `raw`.
+- **No retries.** Each call to a gateway is sent once. A refund or a payment start is never sent twice by the library. If you retry, you decide when it is safe.
+- **Timeouts.** Every call gives up after 15 seconds and throws `TIMEOUT` (30 seconds in `nepal-payments/compat`, as in 2.x). Change it with `timeoutMs`, for all gateways or per gateway.
+- **Every status is a value.** `paid` ships. `pending` and `ambiguous` mean check again later. `failed`, `canceled`, `expired` and `refunded` do not ship. Everything else throws a `PaymentError`: bad input or config, a bad signature, a mismatch, a rejected key, a gateway error, an answer that makes no sense, a call the gateway does not support, or network trouble.
+- **Check errors with `isPaymentError(e)`**, not `instanceof`. It works even when two copies of the package are loaded. Then read `e.code`.
+
+```ts
+import { isPaymentError } from 'nepal-payments';
+
+try {
+  const result = await payments.khalti.verify({ ref: order.ref, expectedAmount: order.amount, expectedOrderId: order.id });
+  if (result.paid) await shipOrder(order);
+} catch (e) {
+  if (isPaymentError(e) && (e.code === 'AMOUNT_MISMATCH' || e.code === 'ORDER_MISMATCH')) {
+    await flagOrder(order); // fraud or a bug, not something to retry
+  }
+  throw e;
+}
+```
+
+## Gateways
+
+| Gateway | Starts with | Callback | Refund | Status |
+| --- | --- | --- | --- | --- |
+| Khalti | redirect | not signed (find the order, verify the stored pidx) | yes | ready |
+| eSewa | signed form | signed (HMAC-SHA256) | no | ready |
+| ConnectIPS | form signed with your RSA key | not signed | no | ready |
+| Hamro Pay | session, then signed form | webhook signed (HMAC-SHA512) | no | ready |
+
+
+## Mock mode and tests
+
+**Mock mode** needs no keys and makes no network call. Use it for local runs and demos.
+
+```ts
+// Mock mode ignores the keys; any string type-checks.
+const payments = createPayments({
+  mode: 'mock',
+  khalti: { secretKey: 'mock' },
+  esewa: { productCode: 'EPAYTEST', secretKey: 'mock' }
+});
+
+const start = await payments.khalti.initiate({ /* ... */ mockOutcome: 'failed' }); // 'paid' (default), 'pending' or 'failed'
+const result = await payments.khalti.verify({ ref: start.ref, expectedAmount, expectedOrderId }); // follows mockOutcome
+```
+
+- Mock mode is refused when `NODE_ENV` is `production` (`INVALID_CONFIG`). Next.js sets that under `next build`, `next start` and Vercel previews, so use `'sandbox'` there.
+- A mock ref is signed with a key made for each process. A typed ref fails, and a ref works only in the process that made it.
+
+**In tests**, use `nepal-payments/testing`. Its fakes answer like the gateway, and `fakeFetch` fails any other request, so a test can never reach a real host.
+
+```ts
+import { createPayments, rupees } from 'nepal-payments';
+import { fakeFetch, fakeKhalti } from 'nepal-payments/testing';
+
+const khalti = fakeKhalti();
+const payments = createPayments({ mode: 'sandbox', fetch: fakeFetch(khalti.handler), khalti: { secretKey: 'test' } });
+
+const start = await payments.khalti.initiate({
+  amount: rupees(100), orderId: 'order-42', orderName: 'Tea',
+  returnUrl: 'https://shop.example/return', websiteUrl: 'https://shop.example'
+});
+khalti.set(start.ref, { amount: rupees(10) }); // the gateway now reports Rs 10
+// verify({ ref: start.ref, expectedAmount: rupees(100), ... }) throws AMOUNT_MISMATCH
+```
+
+Also `fakeEsewa`, `fakeConnectIps`, `fakeHamroPay`, and `esewaCallback()` and `hamroPayWebhook()` to make signed callbacks. The handlers also work with MSW.
+
+## Migrating from `neppayments` 2.x
+
+The package has a new name: `nepal-payments`. To upgrade without changing your code, import the old class from `nepal-payments/compat`. It keeps the 2.0.8 API and outputs, including the 2.x status names.
+
+```ts
+// before
 import { NepPayments } from 'neppayments';
-
-const payments = new NepPayments({
-  khalti: {
-    secretKey: process.env.KHALTI_SECRET_KEY, // Obtain from [Khalti Dashboard](https://test-admin.khalti.com/#/settings/keys)
-    environment: 'sandbox', // or 'production'
-  },
-  esewa: {
-    productCode: 'EPAYTEST',
-    secretKey: '8gBm/:&EnhH.1/q', // Provided in the documentation for sandbox environment
-    environment: 'sandbox', // or 'production'
-    successUrl: 'https://yourdomain.com/payment-success',
-    failureUrl: 'https://yourdomain.com/payment-failure',
-  },
-});
+// after
+import { NepPayments } from 'nepal-payments/compat';
 ```
 
-### 2. Create a Payment
+Then move each call to `createPayments` when you can. It checks the order id too, and keeps eSewa's AMBIGUOUS and Khalti's Refunded as their own statuses.
 
-#### **Khalti**
+| 2.x | 3.x |
+| --- | --- |
+| `new NepPayments({ khalti: { secretKey, environment: 'sandbox' } })` | `createPayments({ mode: 'sandbox', khalti: { secretKey } })` |
+| `khalti.createPayment(...)`, `esewa.createPayment(...)` | `payments.khalti.initiate(...)`, `payments.esewa.initiate(...)` |
+| `verifyPayment({ ..., expectedAmount })` | `verify({ ref, expectedAmount, expectedOrderId })` |
+| Khalti in paisa, eSewa in rupees | paisa everywhere: `rupees(100)` |
+| `COMPLETED`, `FAILED`, ... | `paid`, `failed`, `ambiguous`, `refunded`, ... |
+| Axios | built-in `fetch`, no dependencies |
 
-```ts
-const khaltiPayment = await payments.khalti.createPayment({
-  amount: 1000, // in paisa (Rs. 10)
-  purchase_order_id: 'ORDER_123',
-  purchase_order_name: 'Test Product',
-  return_url: 'https://yourdomain.com/payment-success',
-  website_url: 'https://yourdomain.com',
-  customer_info: {
-    name: 'Test User',
-    email: 'test@example.com',
-    phone: '9800000000',
-  },
-});
+## For coding agents
 
-// Return the payment URL to the client
-console.log(khaltiPayment.payment_url); // e.g., https://test-pay.khalti.com/?pidx=...
+This package is written so an AI coding agent gets payments right the first time. Three files ship inside it:
+
+- [`AGENTS.md`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/AGENTS.md): six rules for payment code. Verify on the server, amounts in paisa, secrets stay on the server, handle every status, verify the stored Khalti pidx, test without keys.
+- [`llms.txt`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/llms.txt): the API on one page, with links to every guide.
+- [`skills/nepal-payments/SKILL.md`](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/skills/nepal-payments/SKILL.md): an agent skill for adding or reviewing payments.
+
+After `npm install`, point your agent at them. For example, add this line to your project's `AGENTS.md` or `CLAUDE.md`:
+
+```md
+Before writing payment code, read node_modules/nepal-payments/AGENTS.md.
 ```
 
-#### **eSewa**
+To use the skill with Claude Code, copy it into your project:
 
-```ts
-const esewaPayment = await payments.esewa.createPayment({
-  amount: 10, // in rupees
-  tax_amount: 0,
-  total_amount: 10,
-  transaction_uuid: 'ORDER_' + Date.now(),
-  product_code: 'EPAYTEST',
-  product_service_charge: 0,
-  product_delivery_charge: 0,
-  success_url: 'https://yourdomain.com/payment-success',
-  failure_url: 'https://yourdomain.com/payment-failure',
-  signed_field_names: 'total_amount,transaction_uuid,product_code',
-});
-
-// The package returns the HTML content for the eSewa payment form.
-// Your backend should serve this HTML to the client.
-console.log(esewaPayment.form_html); // Serve this HTML to the client
+```bash
+mkdir -p .claude/skills && cp -r node_modules/nepal-payments/skills/nepal-payments .claude/skills/
 ```
 
-### 3. Serve the Payment Form to the Client
+The error messages are written for agents too. Each one names the field and says what to do, such as `verify needs expectedAmount in paisa, from your database. Never take it from the callback.`
 
-- **Khalti:** Redirect the client to the `payment_url` returned by the package.
-- **eSewa:** Serve the HTML content (`esewaPayment.form_html`) to the client. The HTML includes an auto-submitting form that redirects to the eSewa payment page.
+## Framework guides
 
-#### eSewa Test Credentials
-- **eSewa ID:** 9806800001 (or 9806800002, 9806800003, 9806800004, 9806800005)
-- **Password:** Nepal@123
-- **Token:** 123456
+- [Express](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/express.md): one file, Khalti and eSewa.
+- [Next.js App Router](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/nextjs.md): Route Handlers on the Node.js runtime.
+- [NestJS](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/docs/nestjs.md): a provider and a controller.
 
-### 4. Verify the Payment (Same for Both)
+## How it is built
 
-```ts
-// Khalti: pass the amount you charged (paisa). A different amount throws AMOUNT_MISMATCH.
-const verification = await payments.khalti.verifyPayment({
-  pidx: 'YOUR_KHALTI_PIDX',
-  expectedAmount: 1000,
-});
-console.log(verification.status, verification.raw_status);
+![How nepal-payments is built: your server code imports createPayments, a single gateway entry, compat or testing. The gateway plugs (Khalti, eSewa, ConnectIPS and Hamro Pay) are opt-in and sit in one socket, the core. The socket handles fetch with a timeout and no retries, secret removal, signing, the verify checks and mock mode, and talks to the gateway hosts, or to the fakes in tests.](https://raw.githubusercontent.com/nischaljs/nepal-payments/v3.0.0-rc.2/docs/media/architecture.svg)
 
-// eSewa: expectedAmount is in rupees.
-const verification = await payments.esewa.verifyPayment({
-  product_code: 'EPAYTEST',
-  transaction_uuid: 'YOUR_TRANSACTION_UUID',
-  total_amount: 10,
-  expectedAmount: 10,
-});
-console.log(verification);
-```
+- **The socket** (`src/core`) does everything that is the same for every gateway: HTTP with a timeout, removing secrets, signing, the money type, config checks, errors, mock mode and the checks in `verify`.
+- **A plug** (`src/gateways/<name>`) only knows its gateway: its config, its hosts and its request and answer shapes. It cannot skip the socket's checks.
+- **The entries** are `nepal-payments`, one subpath per gateway, `nepal-payments/testing` and `nepal-payments/compat`.
 
-Always verify on your server and pass `expectedAmount`. Only `status === 'COMPLETED'` means paid.
-
-### 5. Handling Payment Success [KHALTI]
-
-After the user completes the payment, the success response is obtained in the return URL specified during payment initiation. The callback URL should support the GET method, and the user will be redirected to the return URL with the following parameters for confirmation:
-
-- **pidx**: The initial payment identifier.
-- **status**: Status of the transaction.
-  - **Completed**: Transaction is successful.
-  - **Pending**: Transaction is in a pending state; request the lookup API.
-  - **User canceled**: Transaction has been canceled by the user.
-- **transaction_id**: The transaction identifier at Khalti.
-- **tidx**: Same value as the transaction ID.
-- **amount**: Amount paid in paisa.
-- **mobile**: Payer KHALTI ID.
-- **purchase_order_id**: The initial purchase_order_id provided during payment initiation.
-- **purchase_order_name**: The initial purchase_order_name provided during payment initiation.
-- **total_amount**: Same value as the amount.
-
-**Do not trust these parameters.** Anyone can type them into the URL. Always call `verifyPayment` on your server before you mark an order paid.
-
-**Save the `pidx` when you create the payment, and verify that saved `pidx`, never the one from the return URL.** Khalti's lookup does not return your order id, so this is how you know the payment belongs to this order.
-
-## Developer Experience
-- The API for both Khalti and eSewa is designed to be as similar as possible.
-- For eSewa, your backend serves the HTML form to the client, which auto-submits and redirects to the eSewa payment page.
-- Payment verification is identical for both gateways.
-
-## Error Handling
-- Every method throws a `PaymentError` with `message`, `code` and, when the gateway answered, `response: { status, data }`.
-- Errors never carry request headers or your secret key, so they are safe to log. The gateway objects keep the key in a private field, so logging them does not show it either.
-- Khalti's `Expired` and `User canceled` lookups are returned as statuses, not thrown.
+`npm run depcheck` fails any import that breaks these rules. The rules, and how to add a gateway in five steps: [ARCHITECTURE.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/ARCHITECTURE.md).
 
 ## Contributing
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+
+Issues and pull requests are welcome, especially from anyone who has run ConnectIPS or Hamro Pay against their sandbox.
+
+```bash
+npm install
+npm run check   # types, import rules, tests and a packed install
+```
+
+- Tests run on fake gateways only. A test must never call a sandbox or live host.
+- Keep a gateway's code in its own plug. Shared work belongs in the socket.
+- Add a line to [CHANGELOG.md](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/CHANGELOG.md) for anything a user would notice.
+
+The pictures can be made again. `scripts/demo/record.sh` records the terminal GIF in mock mode, from the packed package (needs `rsvg-convert`, `ffmpeg` and the JetBrains Mono NL font). `docs/media/architecture.svg` is hand-written SVG.
 
 ## License
-MIT
+
+[MIT](https://github.com/nischaljs/nepal-payments/blob/v3.0.0-rc.2/LICENSE)
