@@ -1,7 +1,7 @@
 {
   "name": "nepal-payments",
   "version": "3.0.0-rc.0",
-  "description": "Khalti, eSewa, ConnectIPS and Hamro Pay payments for Node.js and Next.js. One typed TypeScript API to start and verify payments from Nepal's gateways.",
+  "description": "Khalti, eSewa, ConnectIPS and Hamro Pay payments for Node.js and TypeScript. One API to start and verify payments from Nepal's gateways, with amount checks built in. Zero runtime dependencies. Built for coding agents too.",
   "keywords": [
     "nepal",
     "payment",
@@ -22,7 +22,17 @@
     "nestjs",
     "sdk",
     "khalti-sdk",
-    "esewa-sdk"
+    "esewa-sdk",
+    "payments",
+    "nepali",
+    "nepal-payment-gateway",
+    "hamro-pay",
+    "nchl",
+    "esewa-payment",
+    "khalti-payment",
+    "zero-dependency",
+    "ai-agents",
+    "llms-txt"
   ],
   "author": "Nischal Bhattarai",
   "license": "MIT",
@@ -137,6 +147,7 @@
   "files": [
     "dist",
     "docs",
+    "!docs/media",
     "skills",
     "AGENTS.md",
     "README.md",
